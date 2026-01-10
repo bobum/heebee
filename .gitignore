@@ -1,0 +1,58 @@
+# Ren'Py Generated Files
+*.rpyc
+*.rpymc
+*.rpyb
+*.rpybc
+
+# Ren'Py Cache
+cache/
+__pycache__/
+*.py[cod]
+
+# Ren'Py Saves
+saves/
+game/saves/
+
+# Ren'Py SDK (don't commit the SDK itself)
+renpy-*/
+lib/
+renpy/
+renpy.py
+renpy.sh
+renpy.exe
+
+# Ren'Py Logs
+log.txt
+traceback.txt
+errors.txt
+
+# Ren'Py Temporary Files
+tmp/
+*.tmp
+
+# Build outputs
+builds/
+dist/
+
+# OS Generated Files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# IDE and Editor Files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+*.sublime-project
+*.sublime-workspace
+
+# Backup files
+*.bak
+*.backup
