@@ -108,6 +108,10 @@ class MockRenpy:
     def call_in_new_context(self, *args, **kwargs):
         pass
 
+    def restart_interaction(self):
+        """Mock restart_interaction for combat system."""
+        pass
+
 
 class MockPersistent:
     """Mock persistent storage for testing."""
