@@ -1,690 +1,875 @@
-# Skill Tree System for Ren'Py
-# Provides skill trees, unlockable abilities, and skill management
+# Skill Tree System for Ren'Py Visual Novel
+# Provides a complete skill tree with multiple branches, prerequisites, and UI
 
 init python:
-    # =========================================================================
+
+    # ============================================================================
     # SKILL CLASS
-    # =========================================================================
+    # ============================================================================
 
     class Skill:
-        """Represents a single skill in the skill tree."""
+        """
+        Represents a single skill in the skill tree.
 
-        def __init__(self, id, name, description, branch, cost=1,
-                     prerequisites=None, max_level=1, skill_type="active"):
+        Attributes:
+            id: Unique identifier for the skill
+            name: Display name of the skill
+            description: Detailed description of what the skill does
+            cost: Skill points required to unlock/upgrade
+            prerequisites: List of skill IDs that must be unlocked first
+            effects: Dictionary of effects the skill provides
+            level: Current level of the skill (0 = locked)
+            max_level: Maximum level the skill can reach
+            skill_type: "active" or "passive"
+            branch: Which branch this skill belongs to
+            icon: Optional icon path for display
+        """
+
+        def __init__(self, id, name, description, cost=1, prerequisites=None,
+                     effects=None, max_level=1, skill_type="passive", branch="combat", icon=None):
             self.id = id
             self.name = name
             self.description = description
-            self.branch = branch  # combat, magic, social, utility
-            self.cost = cost  # Skill points to unlock
-            self.prerequisites = prerequisites or []  # List of skill IDs required
+            self.cost = cost
+            self.prerequisites = prerequisites if prerequisites else []
+            self.effects = effects if effects else {}
+            self.level = 0
             self.max_level = max_level
-            self.skill_type = skill_type  # active, passive
+            self.skill_type = skill_type
+            self.branch = branch
+            self.icon = icon
 
-            # Effects at each level
-            self.effects = {}  # {level: {effect_type: value}}
+        @property
+        def is_unlocked(self):
+            """Check if the skill has been unlocked (level > 0)."""
+            return self.level > 0
 
-            # For active skills
-            self.mp_cost = 0
-            self.cooldown = 0
-            self.target_type = "enemy"  # enemy, self, ally, all_enemies
+        @property
+        def is_maxed(self):
+            """Check if the skill is at maximum level."""
+            return self.level >= self.max_level
 
-        def set_effects(self, level_effects):
-            """Set effects for each level. {1: {"damage": 10}, 2: {"damage": 15}}"""
-            self.effects = level_effects
+        @property
+        def is_active(self):
+            """Check if this is an active skill."""
+            return self.skill_type == "active"
 
-        def get_effect(self, effect_type, level=1):
-            """Get effect value at specified level."""
-            if level in self.effects:
-                return self.effects[level].get(effect_type, 0)
-            return 0
+        @property
+        def is_passive(self):
+            """Check if this is a passive skill."""
+            return self.skill_type == "passive"
+
+        def get_current_effect(self, effect_name):
+            """Get the current value of an effect based on skill level."""
+            if effect_name not in self.effects:
+                return 0
+            base_value = self.effects[effect_name]
+            return base_value * self.level
+
+        def get_next_level_effect(self, effect_name):
+            """Get the value of an effect at the next level."""
+            if effect_name not in self.effects:
+                return 0
+            base_value = self.effects[effect_name]
+            return base_value * (self.level + 1)
+
+        def unlock(self):
+            """Unlock the skill (set level to 1)."""
+            if self.level == 0:
+                self.level = 1
+                return True
+            return False
+
+        def upgrade(self):
+            """Upgrade the skill by one level."""
+            if self.level < self.max_level:
+                self.level += 1
+                return True
+            return False
 
         def __repr__(self):
-            return f"Skill({self.id}: {self.name})"
+            return f"Skill({self.id}, level={self.level}/{self.max_level})"
 
-    # =========================================================================
+
+    # ============================================================================
     # SKILL TREE CLASS
-    # =========================================================================
+    # ============================================================================
 
     class SkillTree:
-        """Manages all skills and player's progression."""
+        """
+        Manages the entire skill tree system with multiple branches.
+
+        Branches:
+            - Combat: Physical fighting abilities
+            - Magic: Magical spells and abilities
+            - Social: Dialogue and relationship skills
+            - Utility: General purpose skills and bonuses
+        """
 
         BRANCHES = ["combat", "magic", "social", "utility"]
 
         def __init__(self):
+            self.skills = {}
             self.skill_points = 0
-            self.unlocked_skills = {}  # {skill_id: current_level}
-            self.active_skills = []  # Skills equipped for combat (max 4)
-            self.max_active_skills = 4
+            self.total_points_earned = 0
+            self._initialize_skills()
 
-        def add_skill_points(self, points):
-            """Add skill points."""
-            self.skill_points += points
+        def _initialize_skills(self):
+            """Initialize all skills in the skill tree."""
 
-        def can_unlock(self, skill_id):
-            """Check if a skill can be unlocked."""
-            skill = SKILL_DATABASE.get(skill_id)
+            # ====================================================================
+            # COMBAT BRANCH
+            # ====================================================================
+
+            # Tier 1 - Base combat skills
+            self.add_skill(Skill(
+                id="power_strike",
+                name="Power Strike",
+                description="A powerful melee attack that deals increased damage.",
+                cost=1,
+                prerequisites=[],
+                effects={"damage_bonus": 10, "crit_chance": 5},
+                max_level=5,
+                skill_type="active",
+                branch="combat"
+            ))
+
+            self.add_skill(Skill(
+                id="defensive_stance",
+                name="Defensive Stance",
+                description="Adopt a defensive posture, reducing incoming damage.",
+                cost=1,
+                prerequisites=[],
+                effects={"damage_reduction": 5, "block_chance": 10},
+                max_level=3,
+                skill_type="active",
+                branch="combat"
+            ))
+
+            # Tier 2 - Requires tier 1
+            self.add_skill(Skill(
+                id="critical_mastery",
+                name="Critical Mastery",
+                description="Increases critical hit chance and damage.",
+                cost=2,
+                prerequisites=["power_strike"],
+                effects={"crit_chance": 8, "crit_damage": 15},
+                max_level=3,
+                skill_type="passive",
+                branch="combat"
+            ))
+
+            self.add_skill(Skill(
+                id="iron_skin",
+                name="Iron Skin",
+                description="Permanently increases your defense.",
+                cost=2,
+                prerequisites=["defensive_stance"],
+                effects={"defense": 10, "health": 20},
+                max_level=5,
+                skill_type="passive",
+                branch="combat"
+            ))
+
+            # Tier 3 - Ultimate combat
+            self.add_skill(Skill(
+                id="berserker_rage",
+                name="Berserker Rage",
+                description="Enter a powerful rage, greatly increasing attack power but reducing defense.",
+                cost=3,
+                prerequisites=["critical_mastery", "power_strike"],
+                effects={"damage_bonus": 25, "attack_speed": 20},
+                max_level=3,
+                skill_type="active",
+                branch="combat"
+            ))
+
+            # ====================================================================
+            # MAGIC BRANCH
+            # ====================================================================
+
+            # Tier 1 - Base magic skills
+            self.add_skill(Skill(
+                id="mana_bolt",
+                name="Mana Bolt",
+                description="A basic magical projectile that deals arcane damage.",
+                cost=1,
+                prerequisites=[],
+                effects={"magic_damage": 15, "mana_cost": -5},
+                max_level=5,
+                skill_type="active",
+                branch="magic"
+            ))
+
+            self.add_skill(Skill(
+                id="arcane_shield",
+                name="Arcane Shield",
+                description="Create a magical barrier that absorbs damage.",
+                cost=1,
+                prerequisites=[],
+                effects={"shield_strength": 20, "duration": 2},
+                max_level=3,
+                skill_type="active",
+                branch="magic"
+            ))
+
+            # Tier 2 - Elemental magic
+            self.add_skill(Skill(
+                id="fire_mastery",
+                name="Fire Mastery",
+                description="Increases fire damage and unlocks fire spells.",
+                cost=2,
+                prerequisites=["mana_bolt"],
+                effects={"fire_damage": 20, "burn_chance": 15},
+                max_level=3,
+                skill_type="passive",
+                branch="magic"
+            ))
+
+            self.add_skill(Skill(
+                id="mana_regeneration",
+                name="Mana Regeneration",
+                description="Passively regenerate mana over time.",
+                cost=2,
+                prerequisites=["arcane_shield"],
+                effects={"mana_regen": 5, "max_mana": 25},
+                max_level=5,
+                skill_type="passive",
+                branch="magic"
+            ))
+
+            # Tier 3 - Ultimate magic
+            self.add_skill(Skill(
+                id="meteor_storm",
+                name="Meteor Storm",
+                description="Call down a devastating storm of meteors.",
+                cost=3,
+                prerequisites=["fire_mastery", "mana_bolt"],
+                effects={"aoe_damage": 50, "stun_chance": 25},
+                max_level=3,
+                skill_type="active",
+                branch="magic"
+            ))
+
+            # ====================================================================
+            # SOCIAL BRANCH
+            # ====================================================================
+
+            # Tier 1 - Base social skills
+            self.add_skill(Skill(
+                id="persuasion",
+                name="Persuasion",
+                description="Increases your ability to convince others in dialogue.",
+                cost=1,
+                prerequisites=[],
+                effects={"persuade_bonus": 15, "unlock_options": 1},
+                max_level=5,
+                skill_type="passive",
+                branch="social"
+            ))
+
+            self.add_skill(Skill(
+                id="empathy",
+                name="Empathy",
+                description="Better understand the emotions and motivations of others.",
+                cost=1,
+                prerequisites=[],
+                effects={"insight_bonus": 10, "relationship_gain": 10},
+                max_level=3,
+                skill_type="passive",
+                branch="social"
+            ))
+
+            # Tier 2 - Advanced social
+            self.add_skill(Skill(
+                id="silver_tongue",
+                name="Silver Tongue",
+                description="Master the art of speech, unlocking special dialogue options.",
+                cost=2,
+                prerequisites=["persuasion"],
+                effects={"special_dialogue": 1, "price_reduction": 10},
+                max_level=3,
+                skill_type="passive",
+                branch="social"
+            ))
+
+            self.add_skill(Skill(
+                id="emotional_intelligence",
+                name="Emotional Intelligence",
+                description="Gain deeper insights into character relationships.",
+                cost=2,
+                prerequisites=["empathy"],
+                effects={"relationship_speed": 20, "hidden_info": 1},
+                max_level=3,
+                skill_type="passive",
+                branch="social"
+            ))
+
+            # Tier 3 - Ultimate social
+            self.add_skill(Skill(
+                id="master_manipulator",
+                name="Master Manipulator",
+                description="Bend others to your will with masterful social skills.",
+                cost=3,
+                prerequisites=["silver_tongue", "emotional_intelligence"],
+                effects={"mind_control_chance": 20, "all_social": 25},
+                max_level=3,
+                skill_type="active",
+                branch="social"
+            ))
+
+            # ====================================================================
+            # UTILITY BRANCH
+            # ====================================================================
+
+            # Tier 1 - Base utility skills
+            self.add_skill(Skill(
+                id="quick_learner",
+                name="Quick Learner",
+                description="Gain bonus experience from all sources.",
+                cost=1,
+                prerequisites=[],
+                effects={"exp_bonus": 10},
+                max_level=5,
+                skill_type="passive",
+                branch="utility"
+            ))
+
+            self.add_skill(Skill(
+                id="treasure_hunter",
+                name="Treasure Hunter",
+                description="Find more gold and better items.",
+                cost=1,
+                prerequisites=[],
+                effects={"gold_bonus": 15, "item_quality": 10},
+                max_level=3,
+                skill_type="passive",
+                branch="utility"
+            ))
+
+            # Tier 2 - Advanced utility
+            self.add_skill(Skill(
+                id="efficient_training",
+                name="Efficient Training",
+                description="Reduce the cost of learning new skills.",
+                cost=2,
+                prerequisites=["quick_learner"],
+                effects={"skill_cost_reduction": 1},
+                max_level=2,
+                skill_type="passive",
+                branch="utility"
+            ))
+
+            self.add_skill(Skill(
+                id="lucky_star",
+                name="Lucky Star",
+                description="Increase your luck in all random events.",
+                cost=2,
+                prerequisites=["treasure_hunter"],
+                effects={"luck": 15, "rare_find": 10},
+                max_level=3,
+                skill_type="passive",
+                branch="utility"
+            ))
+
+            # Tier 3 - Ultimate utility
+            self.add_skill(Skill(
+                id="jack_of_all_trades",
+                name="Jack of All Trades",
+                description="Gain a bonus to all stats and abilities.",
+                cost=3,
+                prerequisites=["efficient_training", "lucky_star"],
+                effects={"all_stats": 10, "versatility": 15},
+                max_level=3,
+                skill_type="passive",
+                branch="utility"
+            ))
+
+        def add_skill(self, skill):
+            """Add a skill to the skill tree."""
+            self.skills[skill.id] = skill
+
+        def get_skill(self, skill_id):
+            """Get a skill by its ID."""
+            return self.skills.get(skill_id)
+
+        def get_branch_skills(self, branch):
+            """Get all skills in a specific branch."""
+            return [s for s in self.skills.values() if s.branch == branch]
+
+        def check_prerequisites(self, skill_id):
+            """
+            Check if all prerequisites for a skill are met.
+            Returns True if all prerequisites are unlocked.
+            """
+            skill = self.get_skill(skill_id)
             if not skill:
                 return False
 
-            # Already at max level?
-            current_level = self.unlocked_skills.get(skill_id, 0)
-            if current_level >= skill.max_level:
-                return False
-
-            # Have enough points?
-            if self.skill_points < skill.cost:
-                return False
-
-            # Prerequisites met?
             for prereq_id in skill.prerequisites:
-                if prereq_id not in self.unlocked_skills:
+                prereq = self.get_skill(prereq_id)
+                if not prereq or not prereq.is_unlocked:
                     return False
+            return True
+
+        def can_unlock_skill(self, skill_id):
+            """Check if a skill can be unlocked."""
+            skill = self.get_skill(skill_id)
+            if not skill:
+                return False
+
+            # Check if already unlocked
+            if skill.is_unlocked:
+                return False
+
+            # Check prerequisites
+            if not self.check_prerequisites(skill_id):
+                return False
+
+            # Check skill points (accounting for cost reduction from efficient_training)
+            actual_cost = self.get_skill_cost(skill_id)
+            if self.skill_points < actual_cost:
+                return False
 
             return True
+
+        def can_upgrade_skill(self, skill_id):
+            """Check if a skill can be upgraded."""
+            skill = self.get_skill(skill_id)
+            if not skill:
+                return False
+
+            # Must be unlocked first
+            if not skill.is_unlocked:
+                return False
+
+            # Check if at max level
+            if skill.is_maxed:
+                return False
+
+            # Check skill points
+            actual_cost = self.get_skill_cost(skill_id)
+            if self.skill_points < actual_cost:
+                return False
+
+            return True
+
+        def get_skill_cost(self, skill_id):
+            """Get the actual cost of a skill, accounting for cost reduction."""
+            skill = self.get_skill(skill_id)
+            if not skill:
+                return 0
+
+            base_cost = skill.cost
+
+            # Apply cost reduction from efficient_training
+            efficient = self.get_skill("efficient_training")
+            if efficient and efficient.is_unlocked:
+                reduction = efficient.get_current_effect("skill_cost_reduction")
+                base_cost = max(1, base_cost - reduction)
+
+            return base_cost
 
         def unlock_skill(self, skill_id):
-            """Unlock or upgrade a skill."""
-            if not self.can_unlock(skill_id):
+            """
+            Attempt to unlock a skill.
+            Returns True if successful, False otherwise.
+            """
+            if not self.can_unlock_skill(skill_id):
                 return False
 
-            skill = SKILL_DATABASE[skill_id]
-            self.skill_points -= skill.cost
+            skill = self.get_skill(skill_id)
+            cost = self.get_skill_cost(skill_id)
 
-            current_level = self.unlocked_skills.get(skill_id, 0)
-            self.unlocked_skills[skill_id] = current_level + 1
-
+            self.skill_points -= cost
+            skill.unlock()
             return True
 
-        def get_skill_level(self, skill_id):
-            """Get current level of a skill."""
-            return self.unlocked_skills.get(skill_id, 0)
-
-        def has_skill(self, skill_id, min_level=1):
-            """Check if player has skill at minimum level."""
-            return self.get_skill_level(skill_id) >= min_level
-
-        def equip_active_skill(self, skill_id):
-            """Equip an active skill for combat."""
-            if skill_id not in self.unlocked_skills:
+        def upgrade_skill(self, skill_id):
+            """
+            Attempt to upgrade a skill.
+            Returns True if successful, False otherwise.
+            """
+            if not self.can_upgrade_skill(skill_id):
                 return False
 
-            skill = SKILL_DATABASE.get(skill_id)
-            if not skill or skill.skill_type != "active":
-                return False
+            skill = self.get_skill(skill_id)
+            cost = self.get_skill_cost(skill_id)
 
-            if skill_id in self.active_skills:
-                return True
-
-            if len(self.active_skills) >= self.max_active_skills:
-                return False
-
-            self.active_skills.append(skill_id)
+            self.skill_points -= cost
+            skill.upgrade()
             return True
 
-        def unequip_active_skill(self, skill_id):
-            """Unequip an active skill."""
-            if skill_id in self.active_skills:
-                self.active_skills.remove(skill_id)
-                return True
-            return False
+        def add_skill_points(self, amount):
+            """Add skill points (usually from leveling up)."""
+            self.skill_points += amount
+            self.total_points_earned += amount
 
-        def get_equipped_skills(self):
-            """Get list of equipped active skills."""
-            return [SKILL_DATABASE[sid] for sid in self.active_skills if sid in SKILL_DATABASE]
+        def on_level_up(self, new_level):
+            """Called when the player levels up. Awards skill points."""
+            # Award 2 skill points per level, plus 1 bonus every 5 levels
+            points = 2
+            if new_level % 5 == 0:
+                points += 1
 
-        def get_skills_by_branch(self, branch):
-            """Get all skills in a branch."""
-            return [s for s in SKILL_DATABASE.values() if s.branch == branch]
+            # Apply quick_learner bonus
+            quick = self.get_skill("quick_learner")
+            if quick and quick.is_unlocked:
+                bonus_chance = quick.get_current_effect("exp_bonus")
+                # 10% bonus per level means occasional extra point
+                if renpy.random.randint(1, 100) <= bonus_chance:
+                    points += 1
 
-        def get_unlocked_by_branch(self, branch):
-            """Get unlocked skills in a branch."""
-            return [(SKILL_DATABASE[sid], level) for sid, level in self.unlocked_skills.items()
-                    if SKILL_DATABASE.get(sid) and SKILL_DATABASE[sid].branch == branch]
+            self.add_skill_points(points)
+            return points
 
-        def get_passive_bonuses(self):
-            """Calculate total bonuses from all passive skills."""
-            bonuses = {}
+        def get_unlocked_skills(self):
+            """Get all unlocked skills."""
+            return [s for s in self.skills.values() if s.is_unlocked]
 
-            for skill_id, level in self.unlocked_skills.items():
-                skill = SKILL_DATABASE.get(skill_id)
-                if skill and skill.skill_type == "passive":
-                    for effect_type, value in skill.effects.get(level, {}).items():
-                        bonuses[effect_type] = bonuses.get(effect_type, 0) + value
+        def get_active_skills(self):
+            """Get all unlocked active skills."""
+            return [s for s in self.skills.values() if s.is_unlocked and s.is_active]
 
-            return bonuses
+        def get_passive_skills(self):
+            """Get all unlocked passive skills."""
+            return [s for s in self.skills.values() if s.is_unlocked and s.is_passive]
 
-        def to_dict(self):
-            """Convert to dictionary for saving."""
-            return {
-                "skill_points": self.skill_points,
-                "unlocked_skills": self.unlocked_skills.copy(),
-                "active_skills": self.active_skills.copy()
-            }
+        def get_total_effect(self, effect_name):
+            """Get the total value of an effect from all unlocked skills."""
+            total = 0
+            for skill in self.get_unlocked_skills():
+                total += skill.get_current_effect(effect_name)
+            return total
 
-        def from_dict(self, data):
-            """Load from dictionary."""
-            self.skill_points = data.get("skill_points", 0)
-            self.unlocked_skills = data.get("unlocked_skills", {})
-            self.active_skills = data.get("active_skills", [])
+        def reset_all_skills(self):
+            """Reset all skills and refund skill points."""
+            refund = 0
+            for skill in self.skills.values():
+                if skill.is_unlocked:
+                    # Refund based on current level
+                    refund += skill.cost * skill.level
+                    skill.level = 0
+            self.skill_points += refund
+            return refund
 
-# =============================================================================
-# SKILL DATABASE
-# =============================================================================
+        def reset_branch(self, branch):
+            """Reset all skills in a branch and refund skill points."""
+            refund = 0
+            for skill in self.get_branch_skills(branch):
+                if skill.is_unlocked:
+                    refund += skill.cost * skill.level
+                    skill.level = 0
+            self.skill_points += refund
+            return refund
 
-init python:
-    SKILL_DATABASE = {}
 
-    def register_skill(skill):
-        """Register a skill in the database."""
-        SKILL_DATABASE[skill.id] = skill
-        return skill
+# ============================================================================
+# GLOBAL SKILL TREE INSTANCE
+# ============================================================================
 
-# Define skills
-init python:
-    # === COMBAT BRANCH ===
+default skill_tree = SkillTree()
 
-    # Tier 1
-    power_strike = Skill(
-        id="power_strike",
-        name="Power Strike",
-        description="A powerful melee attack dealing increased damage.",
-        branch="combat",
-        cost=1,
-        max_level=3,
-        skill_type="active"
-    )
-    power_strike.mp_cost = 5
-    power_strike.set_effects({
-        1: {"damage_mult": 1.5},
-        2: {"damage_mult": 1.8},
-        3: {"damage_mult": 2.2}
-    })
-    register_skill(power_strike)
 
-    toughness = Skill(
-        id="toughness",
-        name="Toughness",
-        description="Permanently increases maximum HP.",
-        branch="combat",
-        cost=1,
-        max_level=5,
-        skill_type="passive"
-    )
-    toughness.set_effects({
-        1: {"max_hp": 10},
-        2: {"max_hp": 25},
-        3: {"max_hp": 45},
-        4: {"max_hp": 70},
-        5: {"max_hp": 100}
-    })
-    register_skill(toughness)
+# ============================================================================
+# SKILL TREE SCREEN UI
+# ============================================================================
 
-    # Tier 2
-    double_strike = Skill(
-        id="double_strike",
-        name="Double Strike",
-        description="Attack twice in rapid succession.",
-        branch="combat",
-        cost=2,
-        prerequisites=["power_strike"],
-        max_level=2,
-        skill_type="active"
-    )
-    double_strike.mp_cost = 12
-    double_strike.set_effects({
-        1: {"hits": 2, "damage_mult": 0.7},
-        2: {"hits": 2, "damage_mult": 0.85}
-    })
-    register_skill(double_strike)
+style skill_tree_frame:
+    background "#1a1a2e"
+    padding (20, 20)
 
-    armor_mastery = Skill(
-        id="armor_mastery",
-        name="Armor Mastery",
-        description="Increases defense from equipped armor.",
-        branch="combat",
-        cost=2,
-        prerequisites=["toughness"],
-        max_level=3,
-        skill_type="passive"
-    )
-    armor_mastery.set_effects({
-        1: {"armor_mult": 1.1},
-        2: {"armor_mult": 1.2},
-        3: {"armor_mult": 1.35}
-    })
-    register_skill(armor_mastery)
+style skill_branch_frame:
+    background "#16213e"
+    padding (15, 15)
+    margin (5, 5)
 
-    # Tier 3
-    berserker_rage = Skill(
-        id="berserker_rage",
-        name="Berserker Rage",
-        description="Enter a rage, greatly increasing attack but lowering defense.",
-        branch="combat",
-        cost=3,
-        prerequisites=["double_strike", "armor_mastery"],
-        max_level=1,
-        skill_type="active"
-    )
-    berserker_rage.mp_cost = 25
-    berserker_rage.set_effects({
-        1: {"attack_buff": 50, "defense_debuff": 20, "duration": 3}
-    })
-    register_skill(berserker_rage)
+style skill_button:
+    background "#0f3460"
+    hover_background "#e94560"
+    padding (10, 10)
+    minimum (120, 80)
 
-    # === MAGIC BRANCH ===
+style skill_button_locked:
+    background "#333333"
+    padding (10, 10)
+    minimum (120, 80)
 
-    # Tier 1
-    fire_bolt = Skill(
-        id="fire_bolt",
-        name="Fire Bolt",
-        description="Launch a bolt of fire at an enemy.",
-        branch="magic",
-        cost=1,
-        max_level=3,
-        skill_type="active"
-    )
-    fire_bolt.mp_cost = 8
-    fire_bolt.set_effects({
-        1: {"magic_damage": 15},
-        2: {"magic_damage": 25},
-        3: {"magic_damage": 40}
-    })
-    register_skill(fire_bolt)
+style skill_button_maxed:
+    background "#1e5631"
+    padding (10, 10)
+    minimum (120, 80)
 
-    mana_well = Skill(
-        id="mana_well",
-        name="Mana Well",
-        description="Increases maximum MP.",
-        branch="magic",
-        cost=1,
-        max_level=5,
-        skill_type="passive"
-    )
-    mana_well.set_effects({
-        1: {"max_mp": 10},
-        2: {"max_mp": 25},
-        3: {"max_mp": 45},
-        4: {"max_mp": 70},
-        5: {"max_mp": 100}
-    })
-    register_skill(mana_well)
+style skill_name_text:
+    color "#ffffff"
+    size 14
+    text_align 0.5
 
-    # Tier 2
-    ice_shard = Skill(
-        id="ice_shard",
-        name="Ice Shard",
-        description="Hurl a shard of ice that may slow the enemy.",
-        branch="magic",
-        cost=2,
-        prerequisites=["fire_bolt"],
-        max_level=2,
-        skill_type="active"
-    )
-    ice_shard.mp_cost = 12
-    ice_shard.set_effects({
-        1: {"magic_damage": 20, "slow_chance": 0.3},
-        2: {"magic_damage": 35, "slow_chance": 0.5}
-    })
-    register_skill(ice_shard)
+style skill_level_text:
+    color "#aaaaaa"
+    size 12
+    text_align 0.5
 
-    healing_light = Skill(
-        id="healing_light",
-        name="Healing Light",
-        description="Restore HP to yourself or an ally.",
-        branch="magic",
-        cost=2,
-        prerequisites=["mana_well"],
-        max_level=3,
-        skill_type="active"
-    )
-    healing_light.mp_cost = 15
-    healing_light.target_type = "ally"
-    healing_light.set_effects({
-        1: {"heal": 30},
-        2: {"heal": 50},
-        3: {"heal": 80}
-    })
-    register_skill(healing_light)
+style skill_points_text:
+    color "#ffd700"
+    size 18
+    text_align 0.5
 
-    # Tier 3
-    thunderstorm = Skill(
-        id="thunderstorm",
-        name="Thunderstorm",
-        description="Call down lightning on all enemies.",
-        branch="magic",
-        cost=3,
-        prerequisites=["ice_shard"],
-        max_level=1,
-        skill_type="active"
-    )
-    thunderstorm.mp_cost = 35
-    thunderstorm.target_type = "all_enemies"
-    thunderstorm.set_effects({
-        1: {"magic_damage": 45, "stun_chance": 0.2}
-    })
-    register_skill(thunderstorm)
+style branch_title_text:
+    color "#e94560"
+    size 20
+    text_align 0.5
 
-    # === SOCIAL BRANCH ===
-
-    # Tier 1
-    silver_tongue = Skill(
-        id="silver_tongue",
-        name="Silver Tongue",
-        description="Improves prices when buying and selling.",
-        branch="social",
-        cost=1,
-        max_level=3,
-        skill_type="passive"
-    )
-    silver_tongue.set_effects({
-        1: {"price_modifier": 0.05},
-        2: {"price_modifier": 0.10},
-        3: {"price_modifier": 0.15}
-    })
-    register_skill(silver_tongue)
-
-    keen_eye = Skill(
-        id="keen_eye",
-        name="Keen Eye",
-        description="Increases chance of finding hidden items.",
-        branch="social",
-        cost=1,
-        max_level=3,
-        skill_type="passive"
-    )
-    keen_eye.set_effects({
-        1: {"discovery_chance": 0.1},
-        2: {"discovery_chance": 0.2},
-        3: {"discovery_chance": 0.35}
-    })
-    register_skill(keen_eye)
-
-    # Tier 2
-    intimidate = Skill(
-        id="intimidate",
-        name="Intimidate",
-        description="Frighten enemies, potentially making them flee.",
-        branch="social",
-        cost=2,
-        prerequisites=["silver_tongue"],
-        max_level=2,
-        skill_type="active"
-    )
-    intimidate.mp_cost = 10
-    intimidate.set_effects({
-        1: {"flee_chance": 0.2, "defense_debuff": 5},
-        2: {"flee_chance": 0.35, "defense_debuff": 10}
-    })
-    register_skill(intimidate)
-
-    charm = Skill(
-        id="charm",
-        name="Charm",
-        description="Unlock special dialogue options with NPCs.",
-        branch="social",
-        cost=2,
-        prerequisites=["silver_tongue"],
-        max_level=1,
-        skill_type="passive"
-    )
-    charm.set_effects({
-        1: {"unlock_dialogue": True}
-    })
-    register_skill(charm)
-
-    # === UTILITY BRANCH ===
-
-    # Tier 1
-    quick_feet = Skill(
-        id="quick_feet",
-        name="Quick Feet",
-        description="Increases speed and flee chance.",
-        branch="utility",
-        cost=1,
-        max_level=3,
-        skill_type="passive"
-    )
-    quick_feet.set_effects({
-        1: {"speed": 3, "flee_bonus": 0.1},
-        2: {"speed": 6, "flee_bonus": 0.2},
-        3: {"speed": 10, "flee_bonus": 0.3}
-    })
-    register_skill(quick_feet)
-
-    lucky_star = Skill(
-        id="lucky_star",
-        name="Lucky Star",
-        description="Increases critical hit chance and item drop rates.",
-        branch="utility",
-        cost=1,
-        max_level=3,
-        skill_type="passive"
-    )
-    lucky_star.set_effects({
-        1: {"crit_chance": 0.05, "drop_bonus": 0.1},
-        2: {"crit_chance": 0.10, "drop_bonus": 0.2},
-        3: {"crit_chance": 0.15, "drop_bonus": 0.35}
-    })
-    register_skill(lucky_star)
-
-    # Tier 2
-    treasure_hunter = Skill(
-        id="treasure_hunter",
-        name="Treasure Hunter",
-        description="Find extra gold after battles.",
-        branch="utility",
-        cost=2,
-        prerequisites=["lucky_star"],
-        max_level=2,
-        skill_type="passive"
-    )
-    treasure_hunter.set_effects({
-        1: {"gold_bonus": 0.15},
-        2: {"gold_bonus": 0.30}
-    })
-    register_skill(treasure_hunter)
-
-    survivalist = Skill(
-        id="survivalist",
-        name="Survivalist",
-        description="Reduces damage taken when HP is low.",
-        branch="utility",
-        cost=2,
-        prerequisites=["quick_feet"],
-        max_level=2,
-        skill_type="passive"
-    )
-    survivalist.set_effects({
-        1: {"low_hp_defense": 0.15, "threshold": 0.25},
-        2: {"low_hp_defense": 0.30, "threshold": 0.30}
-    })
-    register_skill(survivalist)
-
-# =============================================================================
-# PLAYER SKILL TREE INSTANCE
-# =============================================================================
-
-default player_skills = SkillTree()
-
-# =============================================================================
-# SKILL TREE SCREEN
-# =============================================================================
 
 screen skill_tree_screen():
     tag menu
     modal True
 
     frame:
+        style "skill_tree_frame"
         xfill True
         yfill True
-        background Solid("#1a1a2e")
-        padding (20, 20)
 
         vbox:
             spacing 10
 
             # Header
             hbox:
-                text "Skill Tree" size 32 color "#66aaff"
                 xfill True
-                text "Skill Points: [player_skills.skill_points]" size 24 color "#ffcc66" xalign 1.0
 
-            null height 10
+                text "Skill Tree" size 28 color "#ffffff"
+
+                null width 50
+
+                text "Skill Points: [skill_tree.skill_points]" style "skill_points_text"
+
+                null width 50
+
+                textbutton "Close" action Return() xalign 1.0
+
+            null height 20
 
             # Branch tabs
-            default current_branch = "combat"
-
             hbox:
                 spacing 10
+                xalign 0.5
 
                 for branch in SkillTree.BRANCHES:
                     textbutton branch.capitalize():
                         action SetScreenVariable("current_branch", branch)
-                        style "skill_tab_button"
-                        selected current_branch == branch
+                        style "skill_button"
 
-            null height 20
+            null height 10
 
-            # Skills in current branch
-            viewport:
-                scrollbars "vertical"
-                mousewheel True
-                xfill True
-                ysize 400
+            # Default to combat branch
+            default current_branch = "combat"
 
-                vbox:
-                    spacing 15
-
-                    for skill in player_skills.get_skills_by_branch(current_branch):
-                        $ current_level = player_skills.get_skill_level(skill.id)
-                        $ can_unlock = player_skills.can_unlock(skill.id)
-                        $ is_unlocked = current_level > 0
-
-                        frame:
-                            xfill True
-                            padding (15, 10)
-
-                            if is_unlocked:
-                                background Solid("#2a4a2a")
-                            elif can_unlock:
-                                background Solid("#4a4a2a")
-                            else:
-                                background Solid("#2a2a3e")
-
-                            hbox:
-                                spacing 15
-
-                                # Skill info
-                                vbox:
-                                    xsize 500
-
-                                    hbox:
-                                        text skill.name size 20 color "#fff"
-                                        text " ([skill.skill_type])" size 16 color "#888"
-
-                                    text skill.description size 14 color "#aaa"
-
-                                    if skill.prerequisites:
-                                        $ prereq_names = [SKILL_DATABASE[p].name for p in skill.prerequisites if p in SKILL_DATABASE]
-                                        text "Requires: [', '.join(prereq_names)]" size 12 color "#ff9966"
-
-                                # Level and unlock
-                                vbox:
-                                    xalign 1.0
-
-                                    text "Level: [current_level]/[skill.max_level]" size 16 color "#aaa"
-                                    text "Cost: [skill.cost] SP" size 14 color "#ffcc66"
-
-                                    if can_unlock:
-                                        textbutton "Unlock":
-                                            action Function(player_skills.unlock_skill, skill.id)
-                                            style "skill_unlock_button"
-                                    elif current_level >= skill.max_level:
-                                        text "MAXED" size 14 color "#66ff66"
-
-            # Active skills section
-            null height 20
-
+            # Skill display area
             frame:
+                style "skill_branch_frame"
                 xfill True
-                background Solid("#2a2a4e")
-                padding (15, 10)
+                yfill True
+
+                viewport:
+                    scrollbars "vertical"
+                    mousewheel True
+
+                    vbox:
+                        spacing 15
+
+                        text "[current_branch.capitalize()] Skills" style "branch_title_text" xalign 0.5
+
+                        null height 10
+
+                        # Display skills in tiers
+                        python:
+                            branch_skills = skill_tree.get_branch_skills(current_branch)
+                            # Sort by number of prerequisites (tier)
+                            tier_0 = [s for s in branch_skills if len(s.prerequisites) == 0]
+                            tier_1 = [s for s in branch_skills if len(s.prerequisites) == 1]
+                            tier_2 = [s for s in branch_skills if len(s.prerequisites) >= 2]
+
+                        # Tier labels and skills
+                        if tier_0:
+                            text "Tier 1 - Basic" color "#888888" size 14 xalign 0.5
+                            hbox:
+                                spacing 20
+                                xalign 0.5
+                                for skill in tier_0:
+                                    use skill_display(skill)
+
+                        if tier_1:
+                            null height 20
+                            text "Tier 2 - Advanced" color "#888888" size 14 xalign 0.5
+                            hbox:
+                                spacing 20
+                                xalign 0.5
+                                for skill in tier_1:
+                                    use skill_display(skill)
+
+                        if tier_2:
+                            null height 20
+                            text "Tier 3 - Ultimate" color "#888888" size 14 xalign 0.5
+                            hbox:
+                                spacing 20
+                                xalign 0.5
+                                for skill in tier_2:
+                                    use skill_display(skill)
+
+
+screen skill_display(skill):
+    $ can_unlock = skill_tree.can_unlock_skill(skill.id)
+    $ can_upgrade = skill_tree.can_upgrade_skill(skill.id)
+    $ prereqs_met = skill_tree.check_prerequisites(skill.id)
+    $ cost = skill_tree.get_skill_cost(skill.id)
+
+    vbox:
+        spacing 5
+
+        # Skill button with appropriate style
+        if skill.is_maxed:
+            button:
+                style "skill_button_maxed"
+                action NullAction()
 
                 vbox:
-                    text "Equipped Active Skills ([len(player_skills.active_skills)]/[player_skills.max_active_skills])" size 18 color "#66aaff"
+                    xalign 0.5
+                    text skill.name style "skill_name_text"
+                    text "MAXED" color "#90ee90" size 12 xalign 0.5
+                    text "[skill.level]/[skill.max_level]" style "skill_level_text"
+                    if skill.is_active:
+                        text "(Active)" color "#ffcc00" size 10 xalign 0.5
 
-                    hbox:
-                        spacing 10
+        elif skill.is_unlocked:
+            button:
+                style "skill_button"
+                action Function(skill_tree.upgrade_skill, skill.id)
+                sensitive can_upgrade
 
-                        for skill in player_skills.get_equipped_skills():
-                            frame:
-                                background Solid("#445566")
-                                padding (10, 5)
+                vbox:
+                    xalign 0.5
+                    text skill.name style "skill_name_text"
+                    text "[skill.level]/[skill.max_level]" style "skill_level_text"
+                    if can_upgrade:
+                        text "Upgrade: [cost] pts" color "#90ee90" size 10 xalign 0.5
+                    if skill.is_active:
+                        text "(Active)" color "#ffcc00" size 10 xalign 0.5
 
-                                hbox:
-                                    text skill.name size 14 color "#fff"
-                                    textbutton "X":
-                                        action Function(player_skills.unequip_active_skill, skill.id)
-                                        text_size 12
+        elif prereqs_met:
+            button:
+                style "skill_button"
+                action Function(skill_tree.unlock_skill, skill.id)
+                sensitive can_unlock
 
-            # Close button
+                vbox:
+                    xalign 0.5
+                    text skill.name style "skill_name_text"
+                    text "Locked" color "#ff6666" size 12 xalign 0.5
+                    text "Cost: [cost] pts" color "#aaaaaa" size 10 xalign 0.5
+                    if skill.is_active:
+                        text "(Active)" color "#888888" size 10 xalign 0.5
+
+        else:
+            button:
+                style "skill_button_locked"
+                action NullAction()
+
+                vbox:
+                    xalign 0.5
+                    text skill.name style "skill_name_text" color "#666666"
+                    text "Requires:" color "#ff6666" size 10 xalign 0.5
+                    for prereq_id in skill.prerequisites:
+                        $ prereq = skill_tree.get_skill(prereq_id)
+                        if prereq and not prereq.is_unlocked:
+                            text prereq.name color "#ff6666" size 9 xalign 0.5
+
+        # Tooltip on hover
+        if GetTooltip() == skill.id:
+            frame:
+                background "#000000cc"
+                padding (10, 10)
+
+                vbox:
+                    text skill.name color "#ffffff" size 16
+                    text skill.description color "#cccccc" size 12
+                    null height 5
+                    text "Type: [skill.skill_type.capitalize()]" color "#aaaaaa" size 11
+                    if skill.effects:
+                        text "Effects:" color "#90ee90" size 11
+                        for effect, value in skill.effects.items():
+                            $ effect_display = effect.replace("_", " ").title()
+                            text "  [effect_display]: +[value] per level" color "#88cc88" size 10
+
+
+# ============================================================================
+# SKILL TOOLTIP SCREEN
+# ============================================================================
+
+screen skill_tooltip(skill):
+    frame:
+        background "#000000dd"
+        padding (15, 15)
+
+        vbox:
+            spacing 5
+
+            text skill.name color "#ffffff" size 18 bold True
+
+            null height 5
+
+            text skill.description color "#cccccc" size 13
+
+            null height 10
+
             hbox:
-                xalign 0.5
-                textbutton "Close" action Hide("skill_tree_screen")
+                text "Type: " color "#888888" size 12
+                if skill.is_active:
+                    text "Active" color "#ffcc00" size 12
+                else:
+                    text "Passive" color "#66ccff" size 12
 
-style skill_tab_button:
-    background Solid("#333355")
-    hover_background Solid("#4444aa")
-    selected_background Solid("#5555cc")
-    padding (15, 8)
+            hbox:
+                text "Level: " color "#888888" size 12
+                text "[skill.level]/[skill.max_level]" color "#ffffff" size 12
 
-style skill_tab_button_text:
-    size 18
-    color "#aaa"
-    hover_color "#fff"
-    selected_color "#fff"
+            if skill.effects:
+                null height 5
+                text "Effects:" color "#90ee90" size 12
+                for effect_name, value in skill.effects.items():
+                    $ effect_display = effect_name.replace("_", " ").title()
+                    if skill.is_unlocked:
+                        $ current = skill.get_current_effect(effect_name)
+                        text "  [effect_display]: +[current]" color "#88cc88" size 11
+                    else:
+                        text "  [effect_display]: +[value]/level" color "#888888" size 11
 
-style skill_unlock_button:
-    background Solid("#446644")
-    hover_background Solid("#55aa55")
-    padding (10, 5)
+            if skill.prerequisites:
+                null height 5
+                text "Prerequisites:" color "#ff9999" size 12
+                for prereq_id in skill.prerequisites:
+                    $ prereq = skill_tree.get_skill(prereq_id)
+                    if prereq:
+                        if prereq.is_unlocked:
+                            text "  [prereq.name] (unlocked)" color "#90ee90" size 11
+                        else:
+                            text "  [prereq.name] (locked)" color "#ff6666" size 11
 
-style skill_unlock_button_text:
-    size 14
-    color "#fff"
 
-# =============================================================================
-# HELPER FUNCTIONS
-# =============================================================================
+# ============================================================================
+# HELPER LABELS FOR INTEGRATION
+# ============================================================================
 
-init python:
-    def grant_skill_points(amount):
-        """Give player skill points."""
-        player_skills.add_skill_points(amount)
-        renpy.notify(f"Gained {amount} skill point(s)!")
+label open_skill_tree:
+    call screen skill_tree_screen
+    return
 
-    def has_skill(skill_id, min_level=1):
-        """Check if player has a skill."""
-        return player_skills.has_skill(skill_id, min_level)
+label give_skill_points(amount=1):
+    $ skill_tree.add_skill_points(amount)
+    "You gained [amount] skill point(s)!"
+    return
 
-    def get_passive_bonus(bonus_type):
-        """Get total passive bonus of a type."""
-        return player_skills.get_passive_bonuses().get(bonus_type, 0)
-
-# =============================================================================
-# EXAMPLE USAGE (in script.rpy):
-# =============================================================================
-#
-# # Give skill points on level up
-# $ grant_skill_points(1)
-#
-# # Show skill tree
-# call screen skill_tree_screen
-#
-# # Check if player has a skill for dialogue
-# if has_skill("charm"):
-#     "You use your charm to convince the guard."
-#
-# # Get passive bonuses
-# $ price_mod = get_passive_bonus("price_modifier")
-# $ final_price = int(base_price * (1 - price_mod))
+label player_level_up(new_level):
+    $ points_gained = skill_tree.on_level_up(new_level)
+    "Level Up! You are now level [new_level]!"
+    "You gained [points_gained] skill point(s)!"
+    return
