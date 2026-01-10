@@ -118,18 +118,18 @@ init python:
 
         def choose_action(self, player):
             """AI decides what to do. Returns (action_type, target, data)."""
-            # Simple AI: use skill if MP available, otherwise attack
+            # Priority 1: Heal if low HP (if has healing skill)
+            if self.hp < self.max_hp * 0.3:
+                for skill in self.skills:
+                    if "heal" in skill[0].lower() and self.mp >= skill[1]:
+                        return ("skill", self, skill)
+
+            # Priority 2: Use offensive skill if MP available (30% chance)
             if self.skills and self.mp >= 5:
                 if random.random() < 0.3:  # 30% chance to use skill
                     skill = random.choice(self.skills)
                     if self.mp >= skill[1]:
                         return ("skill", player, skill)
-
-            # Heal if low HP (if has healing)
-            if self.hp < self.max_hp * 0.3:
-                for skill in self.skills:
-                    if "heal" in skill[0].lower() and self.mp >= skill[1]:
-                        return ("skill", self, skill)
 
             return ("attack", player, None)
 
