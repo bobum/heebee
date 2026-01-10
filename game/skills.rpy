@@ -708,43 +708,43 @@ init python:
         manager = SkillManager()
 
         # Combat tree
-        combat = manager.create_skill_tree("Combat", "combat", "Physical combat abilities")
-        combat.add_skill(Skill("power_strike", "Power Strike", "Deal extra damage",
-                               cost=1, effects={"strength_bonus": 2}))
-        combat.add_skill(Skill("shield_bash", "Shield Bash", "Stun enemies briefly",
-                               cost=1))
-        combat.add_skill(Skill("berserker", "Berserker", "Increased damage at low HP",
-                               cost=2, prerequisites=["power_strike"],
+        manager.create_skill_tree("Combat", "combat", "Physical combat abilities")
+        manager.register_skill(Skill("power_strike", "Power Strike", "Deal extra damage",
+                               cost=1, category="combat", effects={"strength_bonus": 2}))
+        manager.register_skill(Skill("shield_bash", "Shield Bash", "Stun enemies briefly",
+                               cost=1, category="combat"))
+        manager.register_skill(Skill("berserker", "Berserker", "Increased damage at low HP",
+                               cost=2, category="combat", prerequisites=["power_strike"],
                                effects={"strength_bonus": 5}))
-        combat.add_skill(Skill("whirlwind", "Whirlwind", "Attack all nearby enemies",
-                               cost=3, prerequisites=["berserker", "shield_bash"]))
+        manager.register_skill(Skill("whirlwind", "Whirlwind", "Attack all nearby enemies",
+                               cost=3, category="combat", prerequisites=["berserker", "shield_bash"]))
 
         # Magic tree
-        magic = manager.create_skill_tree("Magic", "magic", "Arcane abilities")
-        magic.add_skill(Skill("fireball", "Fireball", "Cast a ball of fire",
-                              cost=1, effects={"intelligence_bonus": 2}))
-        magic.add_skill(Skill("ice_shard", "Ice Shard", "Throw sharp ice",
-                              cost=1))
-        magic.add_skill(Skill("inferno", "Inferno", "Massive fire explosion",
-                              cost=3, prerequisites=["fireball"],
+        manager.create_skill_tree("Magic", "magic", "Arcane abilities")
+        manager.register_skill(Skill("fireball", "Fireball", "Cast a ball of fire",
+                              cost=1, category="magic", effects={"intelligence_bonus": 2}))
+        manager.register_skill(Skill("ice_shard", "Ice Shard", "Throw sharp ice",
+                              cost=1, category="magic"))
+        manager.register_skill(Skill("inferno", "Inferno", "Massive fire explosion",
+                              cost=3, category="magic", prerequisites=["fireball"],
                               effects={"intelligence_bonus": 5}))
-        magic.add_skill(Skill("blizzard", "Blizzard", "Freeze all enemies",
-                              cost=3, prerequisites=["ice_shard"]))
-        magic.add_skill(Skill("elemental_mastery", "Elemental Mastery", "Master of elements",
-                              cost=5, prerequisites=["inferno", "blizzard"],
+        manager.register_skill(Skill("blizzard", "Blizzard", "Freeze all enemies",
+                              cost=3, category="magic", prerequisites=["ice_shard"]))
+        manager.register_skill(Skill("elemental_mastery", "Elemental Mastery", "Master of elements",
+                              cost=5, category="magic", prerequisites=["inferno", "blizzard"],
                               effects={"intelligence_bonus": 10}))
 
         # Stealth tree
-        stealth = manager.create_skill_tree("Stealth", "stealth", "Sneaky abilities")
-        stealth.add_skill(Skill("sneak", "Sneak", "Move quietly",
-                                cost=1, effects={"agility_bonus": 2}))
-        stealth.add_skill(Skill("pickpocket", "Pickpocket", "Steal from NPCs",
-                                cost=2, prerequisites=["sneak"]))
-        stealth.add_skill(Skill("backstab", "Backstab", "Critical hit from behind",
-                                cost=2, prerequisites=["sneak"],
+        manager.create_skill_tree("Stealth", "stealth", "Sneaky abilities")
+        manager.register_skill(Skill("sneak", "Sneak", "Move quietly",
+                                cost=1, category="stealth", effects={"agility_bonus": 2}))
+        manager.register_skill(Skill("pickpocket", "Pickpocket", "Steal from NPCs",
+                                cost=2, category="stealth", prerequisites=["sneak"]))
+        manager.register_skill(Skill("backstab", "Backstab", "Critical hit from behind",
+                                cost=2, category="stealth", prerequisites=["sneak"],
                                 effects={"agility_bonus": 3}))
-        stealth.add_skill(Skill("shadow_step", "Shadow Step", "Teleport behind enemies",
-                                cost=4, prerequisites=["backstab"],
+        manager.register_skill(Skill("shadow_step", "Shadow Step", "Teleport behind enemies",
+                                cost=4, category="stealth", prerequisites=["backstab"],
                                 effects={"agility_bonus": 5}))
 
         return manager
