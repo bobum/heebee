@@ -1,584 +1,847 @@
-# Time System for Heebee
-# Manages in-game time, day/night cycles, scheduled events, deadlines, and energy/fatigue
+# Time System for Ren'Py Visual Novel
+# Provides day/time tracking, scheduled events, deadlines, and energy management
 
 init python:
-    from enum import Enum
+    import datetime
 
-    class TimeOfDay(Enum):
-        """Represents different periods of the day."""
-        DAWN = "dawn"           # 5-7
-        MORNING = "morning"     # 7-12
-        AFTERNOON = "afternoon" # 12-17
-        EVENING = "evening"     # 17-20
-        NIGHT = "night"         # 20-24
-        LATE_NIGHT = "late_night"  # 0-5
+    # Time period definitions
+    TIME_PERIODS = ["Morning", "Afternoon", "Evening", "Night"]
+    DAYS_OF_WEEK = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 
     class ScheduledEvent:
-        """
-        Represents an event scheduled to occur at a specific time.
-
-        Attributes:
-            event_id: Unique identifier for the event
-            name: Display name of the event
-            trigger_day: Day number when event triggers (None for recurring)
-            trigger_hour: Hour when event triggers (0-23)
-            callback: Label or function to call when triggered
-            recurring: Whether event repeats daily
-            days_of_week: List of weekday indices (0=Monday) for weekly events
-            active: Whether the event is currently active
-            expired: Whether the event has expired (one-time events)
-        """
-
-        def __init__(self, event_id, name, trigger_day=None, trigger_hour=8,
-                     callback=None, recurring=False, days_of_week=None):
+        """Represents an event that triggers at a specific time/day."""
+        def __init__(self, event_id, name, day=None, time_period=None, day_of_week=None,
+                     label=None, callback=None, repeating=False, priority=0):
             self.event_id = event_id
             self.name = name
-            self.trigger_day = trigger_day
-            self.trigger_hour = trigger_hour
-            self.callback = callback
-            self.recurring = recurring
-            self.days_of_week = days_of_week if days_of_week else []
-            self.active = True
-            self.expired = False
-            self.times_triggered = 0
+            self.day = day  # Specific day number (1, 2, 3, etc.) or None for any day
+            self.time_period = time_period  # "Morning", "Afternoon", etc. or None for any
+            self.day_of_week = day_of_week  # "Monday", etc. or None for any
+            self.label = label  # Ren'Py label to jump to
+            self.callback = callback  # Python function to call
+            self.repeating = repeating  # Whether event repeats
+            self.priority = priority  # Higher priority events trigger first
+            self.triggered = False  # Has this event been triggered?
+            self.enabled = True  # Is this event active?
 
-        def should_trigger(self, current_day, current_hour, current_weekday):
+        def matches(self, day, time_period, day_of_week):
             """Check if this event should trigger at the given time."""
-            if not self.active or self.expired:
+            if not self.enabled:
+                return False
+            if not self.repeating and self.triggered:
                 return False
 
-            # Check hour match
-            if current_hour != self.trigger_hour:
-                return False
+            day_match = self.day is None or self.day == day
+            time_match = self.time_period is None or self.time_period == time_period
+            dow_match = self.day_of_week is None or self.day_of_week == day_of_week
 
-            # For recurring weekly events
-            if self.recurring and self.days_of_week:
-                return current_weekday in self.days_of_week
-
-            # For recurring daily events
-            if self.recurring and not self.days_of_week:
-                return True
-
-            # For one-time events
-            if self.trigger_day is not None:
-                return current_day == self.trigger_day
-
-            return False
+            return day_match and time_match and dow_match
 
         def trigger(self):
-            """Mark the event as triggered."""
-            self.times_triggered += 1
-            if not self.recurring:
-                self.expired = True
-            return self.callback
-
-        def cancel(self):
-            """Cancel the event."""
-            self.active = False
-
-        def __repr__(self):
-            return f"ScheduledEvent({self.event_id}, day={self.trigger_day}, hour={self.trigger_hour})"
-
+            """Mark event as triggered and return the label/callback."""
+            self.triggered = True
+            return (self.label, self.callback)
 
     class Deadline:
-        """
-        Represents a deadline that must be met before expiration.
-
-        Attributes:
-            deadline_id: Unique identifier
-            name: Display name
-            description: What needs to be done
-            due_day: Day number when deadline expires
-            due_hour: Hour when deadline expires
-            completed: Whether deadline was met
-            expired: Whether deadline has passed
-            on_complete: Callback when completed
-            on_expire: Callback when expired
-        """
-
-        def __init__(self, deadline_id, name, description, due_day, due_hour=23,
-                     on_complete=None, on_expire=None):
+        """Represents a quest or task with a day limit."""
+        def __init__(self, deadline_id, name, days_limit, start_day, description="",
+                     warning_days=1, on_expire_label=None, on_complete_label=None):
             self.deadline_id = deadline_id
             self.name = name
+            self.days_limit = days_limit
+            self.start_day = start_day
             self.description = description
-            self.due_day = due_day
-            self.due_hour = due_hour
+            self.warning_days = warning_days  # Days before deadline to show warning
+            self.on_expire_label = on_expire_label
+            self.on_complete_label = on_complete_label
             self.completed = False
             self.expired = False
-            self.on_complete = on_complete
-            self.on_expire = on_expire
 
-        def check_expiration(self, current_day, current_hour):
-            """Check if deadline has expired."""
-            if self.completed or self.expired:
-                return False
+        def days_remaining(self, current_day):
+            """Calculate days remaining until deadline."""
+            elapsed = current_day - self.start_day
+            return max(0, self.days_limit - elapsed)
 
-            if current_day > self.due_day:
-                self.expired = True
-                return True
-            elif current_day == self.due_day and current_hour >= self.due_hour:
-                self.expired = True
-                return True
-            return False
+        def is_expired(self, current_day):
+            """Check if deadline has passed."""
+            return self.days_remaining(current_day) <= 0
+
+        def should_warn(self, current_day):
+            """Check if we should show a warning."""
+            remaining = self.days_remaining(current_day)
+            return remaining <= self.warning_days and remaining > 0 and not self.completed
 
         def complete(self):
-            """Mark deadline as completed."""
-            if not self.expired:
-                self.completed = True
-                return self.on_complete
+            """Mark the deadline as completed."""
+            self.completed = True
+
+        def expire(self):
+            """Mark the deadline as expired."""
+            self.expired = True
+
+    class NPCSchedule:
+        """Defines when an NPC is available at a location."""
+        def __init__(self, npc_id, name):
+            self.npc_id = npc_id
+            self.name = name
+            self.schedule = {}  # {day_of_week: {time_period: location}}
+            self.special_schedule = {}  # {day_number: {time_period: location}}
+
+        def set_regular_schedule(self, day_of_week, time_period, location):
+            """Set regular weekly schedule."""
+            if day_of_week not in self.schedule:
+                self.schedule[day_of_week] = {}
+            self.schedule[day_of_week][time_period] = location
+
+        def set_special_schedule(self, day_number, time_period, location):
+            """Set special schedule for a specific day."""
+            if day_number not in self.special_schedule:
+                self.special_schedule[day_number] = {}
+            self.special_schedule[day_number][time_period] = location
+
+        def get_location(self, day_number, time_period, day_of_week):
+            """Get NPC location at a given time. Returns None if unavailable."""
+            # Check special schedule first
+            if day_number in self.special_schedule:
+                if time_period in self.special_schedule[day_number]:
+                    return self.special_schedule[day_number][time_period]
+
+            # Fall back to regular schedule
+            if day_of_week in self.schedule:
+                if time_period in self.schedule[day_of_week]:
+                    return self.schedule[day_of_week][time_period]
+
             return None
 
-        def time_remaining(self, current_day, current_hour):
-            """Get remaining time as (days, hours) tuple."""
-            if self.completed or self.expired:
-                return (0, 0)
-
-            total_hours_left = (self.due_day - current_day) * 24 + (self.due_hour - current_hour)
-            if total_hours_left < 0:
-                return (0, 0)
-
-            days = total_hours_left // 24
-            hours = total_hours_left % 24
-            return (days, hours)
-
-        def __repr__(self):
-            return f"Deadline({self.deadline_id}, due=day {self.due_day} hour {self.due_hour})"
-
+        def is_available_at(self, location, day_number, time_period, day_of_week):
+            """Check if NPC is at a specific location at the given time."""
+            return self.get_location(day_number, time_period, day_of_week) == location
 
     class TimeManager:
-        """
-        Manages all time-related functionality in the game.
-
-        Time System:
-            - 24-hour days
-            - 7-day weeks (0=Monday through 6=Sunday)
-            - Tracks total days elapsed
-
-        Features:
-            - Time advancement (hours, days)
-            - Day/night cycle detection
-            - Scheduled events
-            - Deadlines with expiration
-            - Energy/fatigue system
-        """
-
-        WEEKDAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
-
-        def __init__(self, start_day=1, start_hour=8, start_weekday=0):
+        """Main class for managing game time, events, and energy."""
+        def __init__(self, start_day=1, start_time_period=0, start_week_day=0):
             # Core time tracking
-            self.day = start_day
-            self.hour = start_hour
-            self.weekday = start_weekday  # 0=Monday, 6=Sunday
-
-            # Events and deadlines
-            self.scheduled_events = {}
-            self.deadlines = {}
-            self.triggered_events = []  # Events triggered this update
+            self.current_day = start_day
+            self.current_time_period = start_time_period  # Index into TIME_PERIODS
+            self.total_days = start_day
+            self.start_week_day = start_week_day  # Which day of week we started on
 
             # Energy/fatigue system
             self.max_energy = 100
-            self.energy = 100
-            self.fatigue = 0
-            self.is_exhausted = False
+            self.energy = self.max_energy
+            self.energy_costs = {
+                "Morning": 0,  # Energy restored after sleep
+                "Afternoon": 10,
+                "Evening": 15,
+                "Night": 20
+            }
+            self.energy_restore_on_sleep = 80
+            self.fatigue_threshold = 20  # Below this, player is exhausted
 
-            # Configuration
-            self.hours_per_action = 1
-            self.energy_per_hour = 5
-            self.fatigue_recovery_rate = 20  # Per night's rest
-            self.exhaustion_threshold = 20  # Energy below this = exhausted
+            # Event tracking
+            self.scheduled_events = []
+            self.deadlines = []
+            self.npc_schedules = {}
 
-        # ===================================================================
-        # TIME ADVANCEMENT
-        # ===================================================================
+            # Calendar events (for display)
+            self.calendar_events = []  # List of (day, name, description) tuples
 
-        def advance_hour(self, hours=1):
-            """
-            Advance time by the specified number of hours.
-            Returns list of events triggered during advancement.
-            """
-            self.triggered_events = []
+        @property
+        def time_period_name(self):
+            """Get current time period as string."""
+            return TIME_PERIODS[self.current_time_period]
 
-            for _ in range(hours):
-                self.hour += 1
+        @property
+        def day_of_week(self):
+            """Get current day of week as string."""
+            # Calculate based on start day and current day
+            day_index = (self.start_week_day + self.current_day - 1) % 7
+            return DAYS_OF_WEEK[day_index]
 
-                # Handle day rollover
-                if self.hour >= 24:
-                    self.hour = 0
-                    self._advance_day()
+        @property
+        def day_of_week_index(self):
+            """Get current day of week as index (0-6)."""
+            return (self.start_week_day + self.current_day - 1) % 7
+
+        @property
+        def week_number(self):
+            """Get current week number."""
+            return ((self.current_day - 1) // 7) + 1
+
+        @property
+        def is_weekend(self):
+            """Check if it's a weekend."""
+            return self.day_of_week in ["Saturday", "Sunday"]
+
+        @property
+        def is_exhausted(self):
+            """Check if player is exhausted."""
+            return self.energy < self.fatigue_threshold
+
+        def get_formatted_date(self):
+            """Get a formatted date string."""
+            return "Day {} ({}) - {}".format(
+                self.current_day,
+                self.day_of_week,
+                self.time_period_name
+            )
+
+        def advance_time(self, periods=1):
+            """Advance time by the specified number of periods."""
+            triggered_events = []
+
+            for _ in range(periods):
+                # Apply energy cost for current period
+                period_name = TIME_PERIODS[self.current_time_period]
+                self.energy -= self.energy_costs.get(period_name, 0)
+                self.energy = max(0, self.energy)
+
+                # Move to next period
+                self.current_time_period += 1
+
+                # Check if we moved to a new day
+                if self.current_time_period >= len(TIME_PERIODS):
+                    self.current_time_period = 0
+                    self.current_day += 1
+                    self.total_days += 1
+
+                    # Restore energy on new day (sleeping)
+                    self.energy = min(self.max_energy, self.energy + self.energy_restore_on_sleep)
+
+                    # Check deadlines
+                    self._check_deadlines()
 
                 # Check for triggered events
-                self._check_events()
+                events = self._check_events()
+                triggered_events.extend(events)
 
-                # Update energy
-                self._update_energy(1)
-
-            return self.triggered_events
+            return triggered_events
 
         def advance_day(self, days=1):
-            """
-            Advance time by the specified number of days.
-            Maintains current hour. Returns list of events triggered.
-            """
-            self.triggered_events = []
+            """Advance to morning of the next day (or multiple days)."""
+            triggered_events = []
 
             for _ in range(days):
-                self._advance_day()
+                self.current_time_period = 0  # Reset to morning
+                self.current_day += 1
+                self.total_days += 1
 
-                # Rest overnight restores energy
-                self._rest_overnight()
+                # Full energy restore after rest
+                self.energy = self.max_energy
 
-                # Check events at current hour on new day
-                self._check_events()
+                # Check deadlines
+                self._check_deadlines()
 
-            return self.triggered_events
+                # Check for morning events
+                events = self._check_events()
+                triggered_events.extend(events)
 
-        def _advance_day(self):
-            """Internal method to advance one day."""
-            self.day += 1
-            self.weekday = (self.weekday + 1) % 7
+            return triggered_events
 
-            # Check deadline expirations
-            self._check_deadlines()
+        def skip_to_time(self, target_period, allow_day_advance=True):
+            """Skip to a specific time period."""
+            triggered_events = []
+            target_index = TIME_PERIODS.index(target_period) if isinstance(target_period, str) else target_period
 
-        def set_time(self, day=None, hour=None):
-            """Set specific time values."""
-            if day is not None:
-                self.day = day
-            if hour is not None:
-                self.hour = max(0, min(23, hour))
+            if target_index == self.current_time_period:
+                return triggered_events
 
-        def skip_to_hour(self, target_hour):
-            """
-            Skip forward to a specific hour (today or tomorrow if past).
-            Returns hours skipped.
-            """
-            target_hour = max(0, min(23, target_hour))
-
-            if target_hour <= self.hour:
-                # Skip to tomorrow
-                hours_to_skip = (24 - self.hour) + target_hour
+            if target_index < self.current_time_period:
+                if allow_day_advance:
+                    # Need to advance to next day
+                    periods_remaining = len(TIME_PERIODS) - self.current_time_period
+                    periods_to_skip = periods_remaining + target_index
+                    return self.advance_time(periods_to_skip)
+                else:
+                    return triggered_events
             else:
-                hours_to_skip = target_hour - self.hour
+                periods_to_skip = target_index - self.current_time_period
+                return self.advance_time(periods_to_skip)
 
-            self.advance_hour(hours_to_skip)
-            return hours_to_skip
+        def skip_to_day(self, target_day, target_period=0):
+            """Skip to a specific day and time period."""
+            if target_day <= self.current_day:
+                return []
 
-        # ===================================================================
-        # TIME OF DAY / DAY-NIGHT CYCLE
-        # ===================================================================
+            days_to_advance = target_day - self.current_day
+            events = self.advance_day(days_to_advance)
 
-        def get_time_of_day(self):
-            """Get the current time of day period."""
-            if 5 <= self.hour < 7:
-                return TimeOfDay.DAWN
-            elif 7 <= self.hour < 12:
-                return TimeOfDay.MORNING
-            elif 12 <= self.hour < 17:
-                return TimeOfDay.AFTERNOON
-            elif 17 <= self.hour < 20:
-                return TimeOfDay.EVENING
-            elif 20 <= self.hour < 24:
-                return TimeOfDay.NIGHT
-            else:  # 0-5
-                return TimeOfDay.LATE_NIGHT
+            if target_period > 0:
+                events.extend(self.advance_time(target_period))
 
-        def is_daytime(self):
-            """Check if it's currently daytime (7am - 8pm)."""
-            return 7 <= self.hour < 20
+            return events
 
-        def is_nighttime(self):
-            """Check if it's currently nighttime (8pm - 7am)."""
-            return self.hour >= 20 or self.hour < 7
-
-        def get_weekday_name(self):
-            """Get the name of the current weekday."""
-            return self.WEEKDAY_NAMES[self.weekday]
-
-        def is_weekend(self):
-            """Check if it's currently a weekend (Saturday/Sunday)."""
-            return self.weekday >= 5
-
-        def get_formatted_time(self):
-            """Get formatted time string (e.g., '2:30 PM')."""
-            if self.hour == 0:
-                return "12:00 AM"
-            elif self.hour < 12:
-                return f"{self.hour}:00 AM"
-            elif self.hour == 12:
-                return "12:00 PM"
-            else:
-                return f"{self.hour - 12}:00 PM"
-
-        def get_date_string(self):
-            """Get formatted date string."""
-            return f"Day {self.day} ({self.get_weekday_name()})"
-
-        # ===================================================================
-        # SCHEDULED EVENTS
-        # ===================================================================
-
-        def schedule_event(self, event_id, name, trigger_day=None, trigger_hour=8,
-                          callback=None, recurring=False, days_of_week=None):
-            """Schedule a new event."""
-            event = ScheduledEvent(
-                event_id=event_id,
-                name=name,
-                trigger_day=trigger_day,
-                trigger_hour=trigger_hour,
-                callback=callback,
-                recurring=recurring,
-                days_of_week=days_of_week
-            )
-            self.scheduled_events[event_id] = event
-            return event
-
-        def cancel_event(self, event_id):
-            """Cancel a scheduled event."""
-            if event_id in self.scheduled_events:
-                self.scheduled_events[event_id].cancel()
+        # Energy management
+        def use_energy(self, amount):
+            """Use energy for an action. Returns True if enough energy."""
+            if self.energy >= amount:
+                self.energy -= amount
                 return True
             return False
 
+        def restore_energy(self, amount):
+            """Restore energy."""
+            self.energy = min(self.max_energy, self.energy + amount)
+
+        def rest(self):
+            """Take a rest, advancing time and restoring some energy."""
+            self.energy = min(self.max_energy, self.energy + 30)
+            return self.advance_time(1)
+
+        # Event management
+        def add_event(self, event):
+            """Add a scheduled event."""
+            self.scheduled_events.append(event)
+            # Sort by priority (higher first)
+            self.scheduled_events.sort(key=lambda e: e.priority, reverse=True)
+
+        def remove_event(self, event_id):
+            """Remove an event by ID."""
+            self.scheduled_events = [e for e in self.scheduled_events if e.event_id != event_id]
+
         def get_event(self, event_id):
-            """Get a scheduled event by ID."""
-            return self.scheduled_events.get(event_id)
-
-        def get_upcoming_events(self, hours_ahead=24):
-            """Get events scheduled within the next N hours."""
-            upcoming = []
-            check_day = self.day
-            check_hour = self.hour
-            check_weekday = self.weekday
-
-            for _ in range(hours_ahead):
-                for event in self.scheduled_events.values():
-                    if event.should_trigger(check_day, check_hour, check_weekday):
-                        if event not in upcoming:
-                            upcoming.append(event)
-
-                check_hour += 1
-                if check_hour >= 24:
-                    check_hour = 0
-                    check_day += 1
-                    check_weekday = (check_weekday + 1) % 7
-
-            return upcoming
+            """Get an event by ID."""
+            for event in self.scheduled_events:
+                if event.event_id == event_id:
+                    return event
+            return None
 
         def _check_events(self):
-            """Check and trigger any events at current time."""
-            for event in self.scheduled_events.values():
-                if event.should_trigger(self.day, self.hour, self.weekday):
-                    callback = event.trigger()
-                    self.triggered_events.append({
-                        'event_id': event.event_id,
-                        'name': event.name,
-                        'callback': callback
+            """Check for and return triggered events."""
+            triggered = []
+            for event in self.scheduled_events:
+                if event.matches(self.current_day, self.time_period_name, self.day_of_week):
+                    label, callback = event.trigger()
+                    triggered.append({
+                        "event": event,
+                        "label": label,
+                        "callback": callback
                     })
+            return triggered
 
-        # ===================================================================
-        # DEADLINES
-        # ===================================================================
+        # Deadline management
+        def add_deadline(self, deadline):
+            """Add a deadline."""
+            self.deadlines.append(deadline)
 
-        def add_deadline(self, deadline_id, name, description, due_day, due_hour=23,
-                        on_complete=None, on_expire=None):
-            """Add a new deadline."""
-            deadline = Deadline(
-                deadline_id=deadline_id,
-                name=name,
-                description=description,
-                due_day=due_day,
-                due_hour=due_hour,
-                on_complete=on_complete,
-                on_expire=on_expire
-            )
-            self.deadlines[deadline_id] = deadline
-            return deadline
-
-        def complete_deadline(self, deadline_id):
-            """Mark a deadline as completed."""
-            if deadline_id in self.deadlines:
-                return self.deadlines[deadline_id].complete()
-            return None
+        def remove_deadline(self, deadline_id):
+            """Remove a deadline by ID."""
+            self.deadlines = [d for d in self.deadlines if d.deadline_id != deadline_id]
 
         def get_deadline(self, deadline_id):
             """Get a deadline by ID."""
-            return self.deadlines.get(deadline_id)
+            for deadline in self.deadlines:
+                if deadline.deadline_id == deadline_id:
+                    return deadline
+            return None
 
-        def get_active_deadlines(self):
-            """Get all active (not completed or expired) deadlines."""
-            return [d for d in self.deadlines.values()
-                    if not d.completed and not d.expired]
-
-        def get_urgent_deadlines(self, hours_threshold=24):
-            """Get deadlines due within the threshold hours."""
-            urgent = []
-            for deadline in self.get_active_deadlines():
-                days, hours = deadline.time_remaining(self.day, self.hour)
-                total_hours = days * 24 + hours
-                if total_hours <= hours_threshold:
-                    urgent.append(deadline)
-            return urgent
+        def complete_deadline(self, deadline_id):
+            """Mark a deadline as completed."""
+            deadline = self.get_deadline(deadline_id)
+            if deadline:
+                deadline.complete()
+                return True
+            return False
 
         def _check_deadlines(self):
             """Check for expired deadlines."""
-            expired = []
-            for deadline in self.deadlines.values():
-                if deadline.check_expiration(self.day, self.hour):
-                    expired.append({
-                        'deadline_id': deadline.deadline_id,
-                        'name': deadline.name,
-                        'callback': deadline.on_expire
-                    })
-            return expired
+            for deadline in self.deadlines:
+                if not deadline.completed and not deadline.expired:
+                    if deadline.is_expired(self.current_day):
+                        deadline.expire()
 
-        # ===================================================================
-        # ENERGY / FATIGUE SYSTEM
-        # ===================================================================
+        def get_active_deadlines(self):
+            """Get all active (not completed, not expired) deadlines."""
+            return [d for d in self.deadlines if not d.completed and not d.expired]
 
-        def get_energy(self):
-            """Get current energy level."""
-            return self.energy
+        def get_warning_deadlines(self):
+            """Get deadlines that should show warnings."""
+            return [d for d in self.deadlines if d.should_warn(self.current_day)]
 
-        def get_fatigue(self):
-            """Get current fatigue level."""
-            return self.fatigue
+        # NPC schedule management
+        def add_npc_schedule(self, npc_schedule):
+            """Add an NPC schedule."""
+            self.npc_schedules[npc_schedule.npc_id] = npc_schedule
 
-        def modify_energy(self, amount):
-            """Modify energy by amount (positive or negative)."""
-            old_energy = self.energy
-            self.energy = max(0, min(self.max_energy, self.energy + amount))
+        def get_npc_location(self, npc_id):
+            """Get current location of an NPC."""
+            if npc_id in self.npc_schedules:
+                return self.npc_schedules[npc_id].get_location(
+                    self.current_day,
+                    self.time_period_name,
+                    self.day_of_week
+                )
+            return None
 
-            # Check exhaustion
-            if self.energy <= self.exhaustion_threshold:
-                self.is_exhausted = True
-            elif self.energy > self.exhaustion_threshold + 10:
-                self.is_exhausted = False
+        def is_npc_at(self, npc_id, location):
+            """Check if an NPC is at a specific location now."""
+            return self.get_npc_location(npc_id) == location
 
-            return self.energy - old_energy
+        def get_npcs_at(self, location):
+            """Get all NPCs currently at a location."""
+            npcs = []
+            for npc_id, schedule in self.npc_schedules.items():
+                if schedule.is_available_at(location, self.current_day,
+                                           self.time_period_name, self.day_of_week):
+                    npcs.append(npc_id)
+            return npcs
 
-        def modify_fatigue(self, amount):
-            """Modify fatigue by amount."""
-            self.fatigue = max(0, min(100, self.fatigue + amount))
+        # Calendar management
+        def add_calendar_event(self, day, name, description=""):
+            """Add an event to the calendar for display."""
+            self.calendar_events.append((day, name, description))
+            self.calendar_events.sort(key=lambda x: x[0])
 
-        def _update_energy(self, hours):
-            """Update energy based on time passed."""
-            energy_cost = hours * self.energy_per_hour
+        def get_upcoming_events(self, days_ahead=7):
+            """Get calendar events in the next N days."""
+            max_day = self.current_day + days_ahead
+            return [(d, n, desc) for d, n, desc in self.calendar_events
+                    if self.current_day <= d <= max_day]
 
-            # Fatigue increases energy drain
-            if self.fatigue > 50:
-                energy_cost = int(energy_cost * 1.5)
+        def get_events_on_day(self, day):
+            """Get all calendar events on a specific day."""
+            return [(d, n, desc) for d, n, desc in self.calendar_events if d == day]
 
-            self.modify_energy(-energy_cost)
-
-            # Accumulate fatigue when active
-            if not self.is_nighttime():
-                self.modify_fatigue(hours * 2)
-
-        def _rest_overnight(self):
-            """Restore energy from overnight rest."""
-            # Full rest only if sleeping at night
-            self.energy = self.max_energy
-            self.fatigue = max(0, self.fatigue - self.fatigue_recovery_rate)
-            self.is_exhausted = False
-
-        def rest(self, hours):
-            """Rest for a number of hours, recovering energy."""
-            recovery_per_hour = 15
-            if self.is_nighttime():
-                recovery_per_hour = 25  # Better recovery at night
-
-            for _ in range(hours):
-                self.modify_energy(recovery_per_hour)
-                self.modify_fatigue(-5)
-                self.advance_hour(1)
-
-        def can_perform_action(self, energy_cost=None):
-            """Check if player has enough energy for an action."""
-            if energy_cost is None:
-                energy_cost = self.energy_per_hour
-            return self.energy >= energy_cost and not self.is_exhausted
-
-        def perform_action(self, energy_cost=None, hours=1):
-            """Perform an action that costs energy and time."""
-            if energy_cost is None:
-                energy_cost = self.energy_per_hour * hours
-
-            if not self.can_perform_action(energy_cost):
-                return False
-
-            self.modify_energy(-energy_cost)
-            self.advance_hour(hours)
-            return True
-
-
-# Initialize time system
+# Initialize the global time manager
 default time_manager = TimeManager()
 
+# Convenience variables for easy access in Ren'Py script
+default current_day = 1
+default current_time = "Morning"
+default current_day_of_week = "Monday"
+default player_energy = 100
 
-# ============================================================================
-# TIME DISPLAY SCREEN
-# ============================================================================
+# Update convenience variables
+init python:
+    def update_time_display():
+        """Update the convenience display variables."""
+        global current_day, current_time, current_day_of_week, player_energy
+        store.current_day = time_manager.current_day
+        store.current_time = time_manager.time_period_name
+        store.current_day_of_week = time_manager.day_of_week
+        store.player_energy = time_manager.energy
+
+# Example scheduled events setup
+init python:
+    def setup_example_events():
+        """Set up example scheduled events."""
+        # Weekly meeting every Monday morning
+        meeting_event = ScheduledEvent(
+            event_id="weekly_meeting",
+            name="Weekly Team Meeting",
+            day_of_week="Monday",
+            time_period="Morning",
+            label="weekly_meeting_scene",
+            repeating=True,
+            priority=10
+        )
+        time_manager.add_event(meeting_event)
+
+        # Special event on day 5 evening
+        special_event = ScheduledEvent(
+            event_id="special_party",
+            name="Special Party",
+            day=5,
+            time_period="Evening",
+            label="party_scene",
+            repeating=False,
+            priority=20
+        )
+        time_manager.add_event(special_event)
+
+        # Add to calendar
+        time_manager.add_calendar_event(5, "Party Night", "Don't forget the party!")
+
+        # Weekend relaxation event (Saturday afternoon)
+        weekend_event = ScheduledEvent(
+            event_id="weekend_rest",
+            name="Weekend Relaxation",
+            day_of_week="Saturday",
+            time_period="Afternoon",
+            label="weekend_scene",
+            repeating=True,
+            priority=5
+        )
+        time_manager.add_event(weekend_event)
+
+    def setup_example_npc_schedules():
+        """Set up example NPC schedules."""
+        # Example NPC: Sarah
+        sarah = NPCSchedule("sarah", "Sarah")
+
+        # Weekday schedule
+        for day in ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]:
+            sarah.set_regular_schedule(day, "Morning", "cafe")
+            sarah.set_regular_schedule(day, "Afternoon", "library")
+            sarah.set_regular_schedule(day, "Evening", "park")
+            sarah.set_regular_schedule(day, "Night", "home")
+
+        # Weekend schedule
+        for day in ["Saturday", "Sunday"]:
+            sarah.set_regular_schedule(day, "Morning", "home")
+            sarah.set_regular_schedule(day, "Afternoon", "mall")
+            sarah.set_regular_schedule(day, "Evening", "restaurant")
+            sarah.set_regular_schedule(day, "Night", "home")
+
+        time_manager.add_npc_schedule(sarah)
+
+        # Example NPC: Mike
+        mike = NPCSchedule("mike", "Mike")
+
+        # Mike works night shifts on weekdays
+        for day in ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]:
+            mike.set_regular_schedule(day, "Morning", "home")
+            mike.set_regular_schedule(day, "Afternoon", "gym")
+            mike.set_regular_schedule(day, "Evening", "work")
+            mike.set_regular_schedule(day, "Night", "work")
+
+        # Weekends free
+        for day in ["Saturday", "Sunday"]:
+            mike.set_regular_schedule(day, "Morning", "home")
+            mike.set_regular_schedule(day, "Afternoon", "park")
+            mike.set_regular_schedule(day, "Evening", "bar")
+            mike.set_regular_schedule(day, "Night", "bar")
+
+        time_manager.add_npc_schedule(mike)
+
+    def setup_example_deadline():
+        """Set up an example deadline."""
+        quest_deadline = Deadline(
+            deadline_id="main_quest",
+            name="Complete Main Investigation",
+            days_limit=7,
+            start_day=1,
+            description="You must complete the investigation within a week!",
+            warning_days=2,
+            on_expire_label="quest_failed"
+        )
+        time_manager.add_deadline(quest_deadline)
+        time_manager.add_calendar_event(8, "Investigation Deadline", "Last day to complete investigation!")
+
+# Screens for the time system
 
 screen time_display():
+    """Display current time in corner of screen."""
     frame:
         xalign 1.0
         yalign 0.0
-        padding (15, 10)
-        background "#00000099"
+        xpadding 20
+        ypadding 10
+        background "#00000080"
 
         vbox:
             spacing 5
 
-            text "[time_manager.get_date_string()]" size 16 color "#ffffff"
-            text "[time_manager.get_formatted_time()]" size 14 color "#aaaaaa"
+            text "Day [time_manager.current_day] - [time_manager.day_of_week]":
+                size 20
+                color "#FFFFFF"
 
-            hbox:
-                spacing 5
-                text "Energy:" size 12 color "#88ff88"
-                bar value time_manager.energy range time_manager.max_energy xmaximum 100
+            text "[time_manager.time_period_name]":
+                size 24
+                color "#FFD700"
 
-            if time_manager.is_exhausted:
-                text "EXHAUSTED" size 12 color "#ff4444"
+            text "Week [time_manager.week_number]":
+                size 16
+                color "#AAAAAA"
 
+screen energy_bar():
+    """Display player energy bar."""
+    frame:
+        xalign 0.0
+        yalign 0.0
+        xpadding 20
+        ypadding 10
+        background "#00000080"
 
-screen deadline_warning(deadline):
-    timer 3.0 action Hide("deadline_warning")
+        vbox:
+            spacing 5
+
+            text "Energy":
+                size 16
+                color "#FFFFFF"
+
+            bar:
+                value time_manager.energy
+                range time_manager.max_energy
+                xsize 150
+                ysize 20
+                left_bar "#00FF00" if time_manager.energy > time_manager.fatigue_threshold else "#FF0000"
+                right_bar "#333333"
+
+            text "[time_manager.energy]/[time_manager.max_energy]":
+                size 14
+                color "#FFFFFF"
+                xalign 0.5
+
+screen calendar_screen():
+    """Calendar screen showing current date and upcoming events."""
+    modal True
 
     frame:
         xalign 0.5
-        yalign 0.1
-        padding (20, 15)
-        background "#ff000099"
+        yalign 0.5
+        xsize 700
+        ysize 500
 
         vbox:
-            text "Deadline Approaching!" size 18 color "#ffffff" bold True
-            text deadline.name size 14 color "#ffcccc"
+            spacing 20
+            xfill True
+
+            # Header
+            hbox:
+                xfill True
+
+                text "Calendar":
+                    size 32
+                    color "#FFD700"
+
+                textbutton "X":
+                    xalign 1.0
+                    action Hide("calendar_screen")
+
+            # Current date display
+            frame:
+                xfill True
+                ysize 80
+                background "#333366"
+
+                vbox:
+                    xalign 0.5
+                    yalign 0.5
+
+                    text "Current Date":
+                        size 16
+                        color "#AAAAAA"
+                        xalign 0.5
+
+                    text "[time_manager.get_formatted_date()]":
+                        size 24
+                        color "#FFFFFF"
+                        xalign 0.5
+
+            # Week display
+            text "This Week":
+                size 20
+                color "#FFFFFF"
+
+            hbox:
+                spacing 10
+                xalign 0.5
+
+                for i, day_name in enumerate(DAYS_OF_WEEK):
+                    $ is_today = (i == time_manager.day_of_week_index)
+
+                    frame:
+                        xsize 80
+                        ysize 60
+                        background "#FFD700" if is_today else "#444444"
+
+                        vbox:
+                            xalign 0.5
+                            yalign 0.5
+
+                            text day_name[:3]:
+                                size 14
+                                color "#000000" if is_today else "#FFFFFF"
+                                xalign 0.5
+
+            # Upcoming events
+            text "Upcoming Events (Next 7 Days)":
+                size 20
+                color "#FFFFFF"
+
+            viewport:
+                ysize 150
+                scrollbars "vertical"
+                mousewheel True
+
+                vbox:
+                    spacing 5
+
+                    $ upcoming = time_manager.get_upcoming_events(7)
+
+                    if upcoming:
+                        for event_day, event_name, event_desc in upcoming:
+                            frame:
+                                xfill True
+                                background "#333333"
+                                xpadding 10
+                                ypadding 5
+
+                                hbox:
+                                    text "Day [event_day]:":
+                                        size 14
+                                        color "#FFD700"
+                                        xsize 80
+
+                                    text "[event_name]":
+                                        size 14
+                                        color "#FFFFFF"
+                    else:
+                        text "No upcoming events.":
+                            size 14
+                            color "#888888"
+
+            # Active deadlines
+            text "Active Deadlines":
+                size 20
+                color "#FFFFFF"
+
+            viewport:
+                ysize 100
+                scrollbars "vertical"
+                mousewheel True
+
+                vbox:
+                    spacing 5
+
+                    $ active_deadlines = time_manager.get_active_deadlines()
+
+                    if active_deadlines:
+                        for deadline in active_deadlines:
+                            $ days_left = deadline.days_remaining(time_manager.current_day)
+                            $ is_warning = deadline.should_warn(time_manager.current_day)
+
+                            frame:
+                                xfill True
+                                background "#660000" if is_warning else "#333333"
+                                xpadding 10
+                                ypadding 5
+
+                                hbox:
+                                    text "[deadline.name]":
+                                        size 14
+                                        color "#FFFFFF"
+                                        xsize 300
+
+                                    text "[days_left] days left":
+                                        size 14
+                                        color "#FF0000" if is_warning else "#00FF00"
+                    else:
+                        text "No active deadlines.":
+                            size 14
+                            color "#888888"
+
+screen time_actions():
+    """Screen with time-related actions."""
+    frame:
+        xalign 0.5
+        yalign 1.0
+        yoffset -50
+
+        hbox:
+            spacing 20
+
+            textbutton "Wait (1 Period)":
+                action [Function(time_manager.advance_time, 1), Function(update_time_display)]
+
+            textbutton "Rest":
+                action [Function(time_manager.rest), Function(update_time_display)]
+
+            textbutton "Sleep (Next Day)":
+                action [Function(time_manager.advance_day, 1), Function(update_time_display)]
+
+            textbutton "Calendar":
+                action Show("calendar_screen")
+
+# Labels for time-based story events
+
+label advance_time_with_events:
+    # Call this to advance time and handle any triggered events
+    python:
+        triggered = time_manager.advance_time(1)
+        update_time_display()
+
+    if triggered:
+        python:
+            for event_data in triggered:
+                if event_data["label"]:
+                    renpy.call(event_data["label"])
+                if event_data["callback"]:
+                    event_data["callback"]()
+
+    return
+
+label check_deadline_warnings:
+    # Call this to check for deadline warnings
+    python:
+        warnings = time_manager.get_warning_deadlines()
+
+    if warnings:
+        $ warning_deadline = warnings[0]
+        $ days_left = warning_deadline.days_remaining(time_manager.current_day)
+
+        "Warning! [warning_deadline.name] - Only [days_left] days remaining!"
+
+    return
+
+# Example scene labels that would be triggered by scheduled events
+
+label weekly_meeting_scene:
+    "It's time for the weekly team meeting."
+    return
+
+label party_scene:
+    "The party has begun!"
+    return
+
+label weekend_scene:
+    "Time to relax on this beautiful Saturday afternoon."
+    return
+
+label quest_failed:
+    "You ran out of time to complete the investigation..."
+    return
+
+# Initialization label to set up the time system
+label setup_time_system:
+    python:
+        setup_example_events()
+        setup_example_npc_schedules()
+        setup_example_deadline()
+        update_time_display()
+    return
+
+# Example of using the time system in game
+label time_system_demo:
+    call setup_time_system
+
+    show screen time_display
+    show screen energy_bar
+
+    "Welcome to the Time System Demo!"
+    "Current time: [time_manager.get_formatted_date()]"
+    "Your energy: [time_manager.energy]/[time_manager.max_energy]"
+
+    menu:
+        "What would you like to do?"
+
+        "Advance Time (1 period)":
             python:
-                days, hours = deadline.time_remaining(time_manager.day, time_manager.hour)
-            text "Time remaining: [days] days, [hours] hours" size 12 color "#ffffff"
+                events = time_manager.advance_time(1)
+                update_time_display()
+            "Time advanced to [time_manager.time_period_name]."
+            if events:
+                "An event was triggered!"
 
+        "Sleep (next day)":
+            python:
+                events = time_manager.advance_day(1)
+                update_time_display()
+            "You slept. It's now Day [time_manager.current_day], [time_manager.time_period_name]."
 
-# ============================================================================
-# HELPER LABELS
-# ============================================================================
+        "Check NPC Locations":
+            $ sarah_loc = time_manager.get_npc_location("sarah")
+            $ mike_loc = time_manager.get_npc_location("mike")
+            "Sarah is at: [sarah_loc]"
+            "Mike is at: [mike_loc]"
 
-label advance_time(hours=1):
-    python:
-        events = time_manager.advance_hour(hours)
-        for event_data in events:
-            if event_data.get('callback'):
-                renpy.call(event_data['callback'])
-    return
+        "Open Calendar":
+            call screen calendar_screen
 
-label sleep_until_morning:
-    python:
-        time_manager.skip_to_hour(7)
-        time_manager._rest_overnight()
-    "You sleep through the night and wake up refreshed."
-    return
+        "End Demo":
+            hide screen time_display
+            hide screen energy_bar
+            return
 
-label check_energy:
-    if time_manager.is_exhausted:
-        "You're too exhausted to continue. You need to rest."
-        return
-    return
+    jump time_system_demo
