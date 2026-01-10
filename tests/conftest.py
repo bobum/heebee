@@ -20,10 +20,14 @@ def extract_python_from_rpy(rpy_path: Path) -> str:
     Extracts code from:
     - `init python:` blocks
     - `python:` blocks
+    - `default varname = value` statements (converted to Python assignments)
     - Class and function definitions within those blocks
     """
     content = rpy_path.read_text()
     python_code = []
+
+    # Regex pattern for Ren'Py default statements: default varname = value
+    default_pattern = re.compile(r'^default\s+(\w+)\s*=\s*(.+)$')
 
     # Track if we're in a python block and its indentation
     in_python_block = False
@@ -35,6 +39,15 @@ def extract_python_from_rpy(rpy_path: Path) -> str:
     while i < len(lines):
         line = lines[i]
         stripped = line.strip()
+
+        # Check for Ren'Py default statements (creates global variables)
+        default_match = default_pattern.match(stripped)
+        if default_match:
+            varname = default_match.group(1)
+            value = default_match.group(2)
+            python_code.append(f"{varname} = {value}")
+            i += 1
+            continue
 
         # Check for python block start
         if stripped.startswith('init python:') or stripped == 'python:':
