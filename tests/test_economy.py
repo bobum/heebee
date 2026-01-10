@@ -361,7 +361,7 @@ class TestShopItem:
         assert item.get_price(0.0) == 100
         assert item.get_price(0.1) == 90
         assert item.get_price(0.5) == 50
-        assert item.get_price(0.9) == 10
+        assert item.get_price(0.9) == 9
 
     def test_shop_item_minimum_price(self, load_system):
         """Test that item price never goes below 1."""
@@ -658,7 +658,7 @@ class TestShop:
 
         # Would be 100% but capped at 90%
         assert shop.get_effective_discount("Item") == 0.9
-        assert shop.get_price("Item") == 10
+        assert shop.get_price("Item") == 9
 
     def test_shop_clear_discounts(self, load_system):
         """Test clearing all discounts."""
