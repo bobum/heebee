@@ -64,6 +64,8 @@ define gui.textbox_yalign = 1.0
 # Placement of the speaking character's name
 define gui.name_xpos = 240
 define gui.name_ypos = 0
+define gui.namebox_width = None
+define gui.namebox_height = None
 
 # Placement of dialogue text
 define gui.dialogue_xpos = 268
