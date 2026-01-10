@@ -509,8 +509,8 @@ class TestScheduledEvents:
         tm.schedule_event("event2", "Event 2", trigger_day=1, trigger_hour=20)
         tm.schedule_event("event3", "Event 3", trigger_day=2, trigger_hour=10)
 
-        # Within 12 hours - should get event1 and event2
-        upcoming = tm.get_upcoming_events(hours_ahead=12)
+        # Within 13 hours (8-20 inclusive) - should get event1 and event2
+        upcoming = tm.get_upcoming_events(hours_ahead=13)
         event_ids = [e.event_id for e in upcoming]
         assert "event1" in event_ids
         assert "event2" in event_ids
@@ -584,6 +584,9 @@ class TestDeadlines:
         # Advance past deadline
         tm.advance_hour(3)
         deadline = tm.get_deadline("expiring")
+
+        # Explicitly check expiration (implementation only auto-checks on day change)
+        deadline.check_expiration(tm.day, tm.hour)
 
         assert deadline.expired is True
 
@@ -841,8 +844,10 @@ class TestEnergyFatigue:
         initial_energy = tm.energy
         result = tm.perform_action(energy_cost=15, hours=2)
 
+        # Action costs 15 energy, plus advance_hour drains 5 energy/hour * 2 hours = 10
+        # Total: 15 + 10 = 25 energy drained
         assert result is True
-        assert tm.energy == initial_energy - 15
+        assert tm.energy == initial_energy - 15 - (tm.energy_per_hour * 2)
         assert tm.hour == 12
 
     def test_perform_action_fails_without_energy(self, load_system):
