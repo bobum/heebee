@@ -105,6 +105,7 @@ init python:
             self.reputation = initial_rep  # -100 to 100
             self.rank = "Neutral"
             self.perks_unlocked = []
+            self._update_rank()
 
         def modify_reputation(self, amount, reason=""):
             old_val = self.reputation
