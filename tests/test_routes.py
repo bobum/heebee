@@ -48,15 +48,32 @@ def RouteManager(route_classes):
 
 
 @pytest.fixture
-def Character(relationship_classes):
-    """Get the Character class."""
-    return relationship_classes["Character"]
+def Character():
+    """Provide a mock Character class for route testing."""
+    class MockCharacter:
+        def __init__(self, name="", id="", affection=50, trust=50, respect=50, romance_available=False):
+            self.name = name
+            self.id = id
+            self.affection = affection
+            self.trust = trust
+            self.respect = respect
+            self.romance_available = romance_available
+    return MockCharacter
 
 
 @pytest.fixture
-def RelationshipManager(relationship_classes):
-    """Get the RelationshipManager class."""
-    return relationship_classes["RelationshipManager"]
+def RelationshipManager():
+    """Provide a mock RelationshipManager for route testing."""
+    class MockRelationshipManager:
+        def __init__(self):
+            self.characters = {}
+
+        def add_character(self, character):
+            self.characters[character.id] = character
+
+        def get_character(self, char_id):
+            return self.characters.get(char_id)
+    return MockRelationshipManager
 
 
 @pytest.fixture
