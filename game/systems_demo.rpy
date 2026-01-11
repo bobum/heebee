@@ -113,6 +113,8 @@ label gameplay_systems_menu:
             call demo_minigames
         "Crafting System":
             call demo_crafting
+        "Breeding System":
+            call breeding_demo
         "Back":
             return
     jump gameplay_systems_menu
