@@ -598,110 +598,126 @@ screen quest_log_screen():
 
     default current_category = "all"
 
-    use game_menu(_("Quest Log"), scroll=None):
+    frame:
+        xfill True
+        yfill True
+        background "#1a1a1a"
+        padding (40, 40)
 
-        style_prefix "quest_log"
-
-        hbox:
+        vbox:
             spacing 20
             xfill True
+            yfill True
 
-            # Left panel: Quest list
-            frame:
-                xsize 350
-                yfill True
-                background "#2a2a2a"
-                padding (15, 15)
+            # Title bar with close button
+            hbox:
+                xfill True
+                text _("Quest Log") size 36 color "#ffffff"
+                textbutton _("Return") action Return() align (1.0, 0.5)
 
-                vbox:
-                    spacing 10
+            style_prefix "quest_log"
 
-                    # Category tabs
-                    hbox:
-                        spacing 5
-                        xfill True
-
-                        textbutton "All" action SetScreenVariable("current_category", "all"):
-                            style "quest_tab_button"
-                            selected current_category == "all"
-
-                        textbutton "Main" action SetScreenVariable("current_category", "main"):
-                            style "quest_tab_button"
-                            selected current_category == "main"
-
-                        textbutton "Side" action SetScreenVariable("current_category", "side"):
-                            style "quest_tab_button"
-                            selected current_category == "side"
-
-                    null height 10
-
-                    # Quest list with scrolling
-                    viewport:
-                        scrollbars "vertical"
-                        mousewheel True
-                        yfill True
-                        xfill True
-
-                        vbox:
-                            spacing 5
-
-                            # Active quests section
-                            if current_category == "all" or current_category == "main":
-                                for quest in quest_manager.get_active_main_quests():
-                                    use quest_list_item(quest)
-
-                            if current_category == "all" or current_category == "side":
-                                for quest in quest_manager.get_active_side_quests():
-                                    use quest_list_item(quest)
-
-                            # Available quests section
-                            $ available = quest_manager.get_available_quests()
-                            if available:
-                                null height 15
-                                text "Available" size 14 color "#888888"
-                                null height 5
-
-                                for quest in available:
-                                    if current_category == "all" or quest.category == current_category:
-                                        use quest_list_item(quest)
-
-                            # Completed quests section
-                            $ completed = quest_manager.get_completed_quests()
-                            if completed:
-                                null height 15
-                                text "Completed" size 14 color "#888888"
-                                null height 5
-
-                                for quest in completed:
-                                    if current_category == "all" or quest.category == current_category:
-                                        use quest_list_item(quest)
-
-                            # Failed quests section
-                            $ failed = quest_manager.get_failed_quests()
-                            if failed:
-                                null height 15
-                                text "Failed" size 14 color "#888888"
-                                null height 5
-
-                                for quest in failed:
-                                    if current_category == "all" or quest.category == current_category:
-                                        use quest_list_item(quest)
-
-            # Right panel: Quest details
-            frame:
+            hbox:
+                spacing 20
                 xfill True
                 yfill True
-                background "#333333"
-                padding (20, 20)
 
-                if selected_quest_id:
-                    $ quest = quest_manager.get_quest(selected_quest_id)
-                    if quest:
-                        use quest_detail_view(quest)
+                # Left panel: Quest list
+                frame:
+                    xsize 350
+                    yfill True
+                    background "#2a2a2a"
+                    padding (15, 15)
+
+                    vbox:
+                        spacing 10
+
+                        # Category tabs
+                        hbox:
+                            spacing 5
+                            xfill True
+
+                            textbutton "All" action SetScreenVariable("current_category", "all"):
+                                style "quest_tab_button"
+                                selected current_category == "all"
+
+                            textbutton "Main" action SetScreenVariable("current_category", "main"):
+                                style "quest_tab_button"
+                                selected current_category == "main"
+
+                            textbutton "Side" action SetScreenVariable("current_category", "side"):
+                                style "quest_tab_button"
+                                selected current_category == "side"
+
+                        null height 10
+
+                        # Quest list with scrolling
+                        viewport:
+                            scrollbars "vertical"
+                            mousewheel True
+                            yfill True
+                            xfill True
+
+                            vbox:
+                                spacing 5
+
+                                # Active quests section
+                                if current_category == "all" or current_category == "main":
+                                    for quest in quest_manager.get_active_main_quests():
+                                        use quest_list_item(quest)
+
+                                if current_category == "all" or current_category == "side":
+                                    for quest in quest_manager.get_active_side_quests():
+                                        use quest_list_item(quest)
+
+                                # Available quests section
+                                $ available = quest_manager.get_available_quests()
+                                if available:
+                                    null height 15
+                                    text "Available" size 14 color "#888888"
+                                    null height 5
+
+                                    for quest in available:
+                                        if current_category == "all" or quest.category == current_category:
+                                            use quest_list_item(quest)
+
+                                # Completed quests section
+                                $ completed = quest_manager.get_completed_quests()
+                                if completed:
+                                    null height 15
+                                    text "Completed" size 14 color "#888888"
+                                    null height 5
+
+                                    for quest in completed:
+                                        if current_category == "all" or quest.category == current_category:
+                                            use quest_list_item(quest)
+
+                                # Failed quests section
+                                $ failed = quest_manager.get_failed_quests()
+                                if failed:
+                                    null height 15
+                                    text "Failed" size 14 color "#888888"
+                                    null height 5
+
+                                    for quest in failed:
+                                        if current_category == "all" or quest.category == current_category:
+                                            use quest_list_item(quest)
+
+                # Right panel: Quest details
+                frame:
+                    xfill True
+                    yfill True
+                    background "#333333"
+                    padding (20, 20)
+
+                    if selected_quest_id:
+                        $ quest = quest_manager.get_quest(selected_quest_id)
+                        if quest:
+                            use quest_detail_view(quest)
+                        else:
+                            text "Quest not found" align (0.5, 0.5) color "#666666"
                     else:
-                        text "Quest not found" align (0.5, 0.5) color "#666666"
-                else:
-                    text "Select a quest to view details" align (0.5, 0.5) color "#666666"
+                        text "Select a quest to view details" align (0.5, 0.5) color "#666666"
 
 # Quest list item component
 screen quest_list_item(quest):
@@ -734,15 +750,18 @@ screen quest_list_item(quest):
                     background "#666666"
 
             # Category indicator
-            text "[" + ("M" if quest.is_main_quest() else "S") + "]":
+            $ cat_text = "[" + ("M" if quest.is_main_quest() else "S") + "]"
+            $ cat_color = "#ffaa00" if quest.is_main_quest() else "#888888"
+            text cat_text:
                 size 12
-                color "#888888" if not quest.is_main_quest() else "#ffaa00"
+                color cat_color
                 yalign 0.5
 
             # Quest name
+            $ name_color = "#ffffff" if quest.is_active() else "#aaaaaa"
             text quest.name:
                 size 16
-                color "#ffffff" if quest.is_active() else "#aaaaaa"
+                color name_color
                 yalign 0.5
 
 # Quest detail view component

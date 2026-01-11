@@ -7,23 +7,23 @@
 # ============================================================================
 
 screen say(who, what):
-    style_prefix "say"
-
-    window:
-        id "window"
+    window id "window":
+        xfill True
+        yalign 1.0
+        ysize 185
+        background Solid("#000000dd")
+        padding (20, 20, 20, 20)
 
         if who is not None:
-            window:
-                id "namebox"
-                style "namebox"
-                text who id "who"
-
-        text what id "what"
+            text who xpos 20 ypos 10 color "#66aaff" size 28
+            text what id "what" xpos 20 ypos 50 color "#ffffff" size 22
+        else:
+            text what id "what" xpos 20 ypos 20 color "#ffffff" size 22
 
 style window:
     xfill True
     yalign 1.0
-    ysize gui.textbox_height
+    ysize 185
     background Solid("#000000aa")
 
 style namebox:
@@ -183,6 +183,7 @@ screen main_menu():
             null height 30
 
             textbutton _("Start") action Start() xalign 0.5
+            textbutton _("Systems Demo") action Start("systems_demo") xalign 0.5
             textbutton _("Load") action ShowMenu("load") xalign 0.5
             textbutton _("Preferences") action ShowMenu("preferences") xalign 0.5
             textbutton _("Quit") action Quit(confirm=not main_menu) xalign 0.5

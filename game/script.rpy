@@ -9,7 +9,7 @@
 
 define e = Character("Elena", color="#c8ffc8")
 define m = Character("Marcus", color="#c8c8ff")
-define narrator = Character(None, kind=nvl)  # For NVL-mode narration
+define narrator = Character(None)  # Standard ADV-mode narration
 
 # ============================================================================
 # IMAGE DEFINITIONS (Placeholders)

@@ -3,7 +3,7 @@
 # unlock notifications, progress tracking, and a gallery UI.
 
 init python:
-    from datetime import datetime
+    import datetime as dt
 
     # =========================================================================
     # ACHIEVEMENT CATEGORIES - Organize achievements by type
@@ -59,7 +59,7 @@ init python:
             """
             if not self.unlocked:
                 self.unlocked = True
-                self.unlock_date = datetime.now()
+                self.unlock_date = dt.datetime.now()
                 return True
             return False
 
@@ -572,7 +572,7 @@ init python:
 # =============================================================================
 
 screen achievement_notification(achievement):
-    """Toast-style notification that appears when an achievement is unlocked."""
+#    Toast-style notification that appears when an achievement is unlocked.
 
     zorder 200
     modal False
@@ -621,71 +621,97 @@ transform achievement_toast_transform:
 # =============================================================================
 
 screen achievement_gallery():
-    """Full achievement gallery with categories and progress."""
+    # Full achievement gallery with categories and progress.
 
     tag menu
 
-    use game_menu(_("Achievements"), scroll="viewport"):
-
-        style_prefix "achievement"
+    frame:
+        xfill True
+        yfill True
+        background "#1a1a1a"
+        padding (40, 40)
 
         vbox:
             spacing 20
+            xfill True
+            yfill True
 
-            # Overall stats header
-            frame:
-                style "achievement_stats_frame"
+            # Title bar with close button
+            hbox:
+                xfill True
+                text _("Achievements") size 36 color "#ffffff"
+                textbutton _("Return") action Return() align (1.0, 0.5)
 
-                hbox:
-                    xfill True
-                    spacing 30
+            style_prefix "achievement"
 
-                    vbox:
-                        text "Total Progress" size 20
-                        text "[achievement_manager.get_unlock_count()]/[achievement_manager.get_total_count()]" size 32
+            viewport:
+                scrollbars "vertical"
+                mousewheel True
+                xfill True
+                yfill True
 
-                    vbox:
-                        text "Points" size 20
-                        text "[achievement_manager.get_total_points()]/[achievement_manager.get_max_points()]" size 32
+                vbox:
+                    spacing 20
 
-                    vbox:
-                        text "Completion" size 20
-                        text "[achievement_manager.get_completion_percent()]%" size 32
-
-            # Category tabs and achievements
-            for cat_id, cat_data in ACHIEVEMENT_CATEGORIES.items():
-                $ cat_achievements = achievement_manager.get_by_category(cat_id)
-                $ cat_unlocked = achievement_manager.get_unlocked_by_category(cat_id)
-
-                if cat_achievements:
+                    # Overall stats header
                     frame:
-                        style "achievement_category_frame"
+                        style "achievement_stats_frame"
 
-                        vbox:
-                            spacing 10
+                        hbox:
+                            xfill True
+                            spacing 30
 
-                            # Category header
-                            hbox:
-                                text cat_data["label"] size 28 color "#ffffff"
-                                null width 20
-                                text "([len(cat_unlocked)]/[len(cat_achievements)])" size 20 color "#888888"
+                            vbox:
+                                text "Total Progress" size 20
+                                text "[achievement_manager.get_unlock_count()]/[achievement_manager.get_total_count()]" size 32
 
-                            # Category achievements
-                            for ach in cat_achievements:
-                                if not ach.hidden or ach.unlocked:
-                                    use achievement_entry(ach)
+                            vbox:
+                                text "Points" size 20
+                                text "[achievement_manager.get_total_points()]/[achievement_manager.get_max_points()]" size 32
 
-                            # Show count of hidden achievements
-                            $ hidden_count = len([a for a in cat_achievements if a.hidden and not a.unlocked])
-                            if hidden_count > 0:
-                                text "+ [hidden_count] hidden achievement(s)" size 16 color "#666666" italic True
+                            vbox:
+                                text "Completion" size 20
+                                text "[achievement_manager.get_completion_percent()]%" size 32
+
+                    # Category tabs and achievements
+                    for cat_id, cat_data in ACHIEVEMENT_CATEGORIES.items():
+                        $ cat_achievements = achievement_manager.get_by_category(cat_id)
+                        $ cat_unlocked = achievement_manager.get_unlocked_by_category(cat_id)
+
+                        if cat_achievements:
+                            frame:
+                                style "achievement_category_frame"
+
+                                vbox:
+                                    spacing 10
+
+                                    # Category header
+                                    hbox:
+                                        text cat_data["label"] size 28 color "#ffffff"
+                                        null width 20
+                                        text "([len(cat_unlocked)]/[len(cat_achievements)])" size 20 color "#888888"
+
+                                    # Category achievements
+                                    for ach in cat_achievements:
+                                        if not ach.hidden or ach.unlocked:
+                                            use achievement_entry(ach)
+
+                                    # Show count of hidden achievements
+                                    $ hidden_count = len([a for a in cat_achievements if a.hidden and not a.unlocked])
+                                    if hidden_count > 0:
+                                        text "+ [hidden_count] hidden achievement(s)" size 16 color "#666666" italic True
 
 screen achievement_entry(achievement):
-    """Single achievement entry in the gallery."""
+    # Single achievement entry in the gallery.
+
+    $ entry_bg = "#333333" if achievement.unlocked else "#222222"
+    $ name_color = "#ffffff" if achievement.unlocked else "#888888"
+    $ points_color = "#ffcc00" if achievement.unlocked else "#555555"
+    $ desc_color = "#aaaaaa" if achievement.unlocked else "#666666"
 
     frame:
         style "achievement_entry_frame"
-        background "#333333" if achievement.unlocked else "#222222"
+        background entry_bg
 
         hbox:
             spacing 15
@@ -708,12 +734,12 @@ screen achievement_entry(achievement):
 
                 # Name and points
                 hbox:
-                    text achievement.get_display_name() size 20 color "#ffffff" if achievement.unlocked else "#888888"
+                    text achievement.get_display_name() size 20 color name_color
                     null width 15
-                    text "[achievement.points] pts" size 16 color "#ffcc00" if achievement.unlocked else "#555555"
+                    text "[achievement.points] pts" size 16 color points_color
 
                 # Description
-                text achievement.get_display_description() size 14 color "#aaaaaa" if achievement.unlocked else "#666666"
+                text achievement.get_display_description() size 14 color desc_color
 
                 # Progress bar for progress achievements
                 if isinstance(achievement, ProgressAchievement) and not achievement.unlocked:

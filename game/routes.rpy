@@ -563,7 +563,7 @@ init python:
 # -----------------------------------------------------------------------------
 
 screen route_selection_screen(available_routes=None):
-    """Screen for selecting a route when multiple are available."""
+    # Screen for selecting a route when multiple are available.
 
     modal True
     zorder 200
@@ -597,10 +597,11 @@ screen route_selection_screen(available_routes=None):
             # Route options
             if available_routes:
                 for route in available_routes:
+                    $ route_bg = "#2a2a4e" if selected_route != route.id else "#4a4a8e"
                     button:
                         xfill True
                         padding (20, 15)
-                        background "#2a2a4e" if selected_route != route.id else "#4a4a8e"
+                        background route_bg
                         hover_background "#3a3a6e"
                         action SetScreenVariable("selected_route", route.id)
 
@@ -626,10 +627,11 @@ screen route_selection_screen(available_routes=None):
                                 # Show incompatibilities warning
                                 if route.incompatible_routes:
                                     $ blocked_names = []
-                                    for blocked_id in route.incompatible_routes:
-                                        $ blocked_route = route_manager.get_route(blocked_id)
-                                        if blocked_route:
-                                            $ blocked_names.append(blocked_route.character_name)
+                                    python:
+                                        for blocked_id in route.incompatible_routes:
+                                            blocked_route = route_manager.get_route(blocked_id)
+                                            if blocked_route:
+                                                blocked_names.append(blocked_route.character_name)
                                     if blocked_names:
                                         $ warning_text = "Blocks: " + ", ".join(blocked_names)
                                         text warning_text size 14 color "#ff6666"
@@ -647,10 +649,12 @@ screen route_selection_screen(available_routes=None):
                     hover_background "#555555"
                     action Return(None)
 
+                $ confirm_bg = "#2255aa" if selected_route else "#333333"
+                $ confirm_hover = "#3366cc" if selected_route else "#333333"
                 textbutton "Confirm Selection":
                     padding (30, 10)
-                    background "#2255aa" if selected_route else "#333333"
-                    hover_background "#3366cc" if selected_route else "#333333"
+                    background confirm_bg
+                    hover_background confirm_hover
                     sensitive selected_route is not None
                     action Return(selected_route)
 
@@ -660,7 +664,7 @@ screen route_selection_screen(available_routes=None):
 # -----------------------------------------------------------------------------
 
 screen route_indicator():
-    """Persistent indicator showing current route status."""
+    # Persistent indicator showing current route status.
 
     zorder 50
 
@@ -698,7 +702,7 @@ screen route_indicator():
 # -----------------------------------------------------------------------------
 
 screen route_lockin_confirmation(route_id):
-    """Confirmation screen before locking into a route."""
+    # Confirmation screen before locking into a route.
 
     modal True
     zorder 200
@@ -758,10 +762,11 @@ screen route_lockin_confirmation(route_id):
 
                         if route.incompatible_routes:
                             $ blocked_names = []
-                            for blocked_id in route.incompatible_routes:
-                                $ blocked_route = route_manager.get_route(blocked_id)
-                                if blocked_route:
-                                    $ blocked_names.append(blocked_route.character_name)
+                            python:
+                                for blocked_id in route.incompatible_routes:
+                                    blocked_route = route_manager.get_route(blocked_id)
+                                    if blocked_route:
+                                        blocked_names.append(blocked_route.character_name)
                             if blocked_names:
                                 $ warning = "This will permanently close the following paths: " + ", ".join(blocked_names)
                                 text warning xalign 0.5 size 16 color "#ff6666"
@@ -795,110 +800,130 @@ screen route_lockin_confirmation(route_id):
 # -----------------------------------------------------------------------------
 
 screen route_status_screen():
-    """Full screen showing all routes and their current status."""
+    # Full screen showing all routes and their current status.
 
     tag menu
+    modal True
 
-    use game_menu(_("Routes"), scroll="viewport"):
-
-        style_prefix "route_status"
+    frame:
+        xfill True
+        yfill True
+        background "#1a1a2e"
+        padding (40, 40)
 
         vbox:
-            spacing 20
+            spacing 15
 
-            # Current route section
-            if route_manager.is_locked_in():
-                $ current = route_manager.get_current_route()
+            # Header with title and close button
+            hbox:
+                xfill True
+                text "Routes" size 36 color "#aaaaff"
+                textbutton "Return" action Return() xalign 1.0
 
-                text "Current Route" size 32 color "#66aaff"
+            style_prefix "route_status"
 
-                frame:
-                    xfill True
-                    padding (25, 20)
-                    background "#2a4a2a"
+            viewport:
+                scrollbars "vertical"
+                mousewheel True
+                draggable True
+                ysize 500
 
-                    hbox:
-                        spacing 20
+                vbox:
+                    spacing 20
+
+                    # Current route section
+                    if route_manager.is_locked_in():
+                        $ current = route_manager.get_current_route()
+
+                        text "Current Route" size 32 color "#66aaff"
 
                         frame:
-                            xysize (80, 80)
-                            background "#3a6a3a"
-                            if current.icon:
-                                add current.icon fit "contain"
-                            else:
-                                text current.character_name[0] align (0.5, 0.5) size 40 color "#ffffff"
-
-                        vbox:
-                            spacing 8
-                            text current.character_name size 26 color "#ffffff"
-                            text current.description size 16 color "#aaddaa"
-                            text "Locked In" size 14 color "#88ff88"
-
-                null height 20
-
-            # Available routes section
-            text "All Routes" size 32 color "#ffffff"
-
-            null height 10
-
-            for route in route_manager.get_all_routes():
-                $ is_current = route_manager.get_current_route_id() == route.id
-                $ is_blocked = route.id in route_manager.get_blocked_routes()
-
-                frame:
-                    xfill True
-                    padding (20, 15)
-                    if is_current:
-                        background "#2a4a2a"
-                    elif is_blocked:
-                        background "#4a2a2a"
-                    elif route.locked_in:
-                        background "#2a2a4a"
-                    else:
-                        background "#333333"
-
-                    hbox:
-                        spacing 20
-
-                        # Route icon
-                        frame:
-                            xysize (60, 60)
-                            if is_blocked:
-                                background "#553333"
-                            else:
-                                background "#555555"
-
-                            if route.icon:
-                                add route.icon fit "contain"
-                            else:
-                                text route.character_name[0] align (0.5, 0.5) size 30 color "#ffffff"
-
-                        vbox:
-                            spacing 5
                             xfill True
+                            padding (25, 20)
+                            background "#2a4a2a"
 
-                            # Name and status
                             hbox:
-                                text route.character_name size 22 color "#ffffff"
-                                null width 15
+                                spacing 20
 
-                                if is_current:
-                                    text "[ACTIVE]" size 16 color "#88ff88"
-                                elif is_blocked:
-                                    text "[BLOCKED]" size 16 color "#ff6666"
-                                elif route.locked_in:
-                                    text "[LOCKED]" size 16 color "#6688ff"
+                                frame:
+                                    xysize (80, 80)
+                                    background "#3a6a3a"
+                                    if current.icon:
+                                        add current.icon fit "contain"
+                                    else:
+                                        text current.character_name[0] align (0.5, 0.5) size 40 color "#ffffff"
 
-                            text route.description size 15 color "#aaaaaa"
+                                vbox:
+                                    spacing 8
+                                    text current.character_name size 26 color "#ffffff"
+                                    text current.description size 16 color "#aaddaa"
+                                    text "Locked In" size 14 color "#88ff88"
 
-                            # Requirements display
-                            $ reqs = route.requirements
+                        null height 20
+
+                    # Available routes section
+                    text "All Routes" size 32 color "#ffffff"
+
+                    null height 10
+
+                    for route in route_manager.get_all_routes():
+                        $ is_current = route_manager.get_current_route_id() == route.id
+                        $ is_blocked = route.id in route_manager.get_blocked_routes()
+
+                        if is_current:
+                            $ frame_bg = "#2a4a2a"
+                        elif is_blocked:
+                            $ frame_bg = "#4a2a2a"
+                        elif route.locked_in:
+                            $ frame_bg = "#2a2a4a"
+                        else:
+                            $ frame_bg = "#333333"
+
+                        frame:
+                            xfill True
+                            padding (20, 15)
+                            background frame_bg
+
                             hbox:
-                                spacing 15
-                                text "Required:" size 13 color "#888888"
-                                text "Affection: [reqs['affection']]" size 13 color "#ff6699"
-                                text "Trust: [reqs['trust']]" size 13 color "#66ccff"
-                                text "Respect: [reqs['respect']]" size 13 color "#ffcc66"
+                                spacing 20
+
+                                # Route icon
+                                $ icon_bg = "#553333" if is_blocked else "#555555"
+                                frame:
+                                    xysize (60, 60)
+                                    background icon_bg
+
+                                    if route.icon:
+                                        add route.icon fit "contain"
+                                    else:
+                                        text route.character_name[0] align (0.5, 0.5) size 30 color "#ffffff"
+
+                                vbox:
+                                    spacing 5
+                                    xfill True
+
+                                    # Name and status
+                                    hbox:
+                                        text route.character_name size 22 color "#ffffff"
+                                        null width 15
+
+                                        if is_current:
+                                            text "[ACTIVE]" size 16 color "#88ff88"
+                                        elif is_blocked:
+                                            text "[BLOCKED]" size 16 color "#ff6666"
+                                        elif route.locked_in:
+                                            text "[LOCKED]" size 16 color "#6688ff"
+
+                                    text route.description size 15 color "#aaaaaa"
+
+                                    # Requirements display
+                                    $ reqs = route.requirements
+                                    hbox:
+                                        spacing 15
+                                        text "Required:" size 13 color "#888888"
+                                        text "Affection: [reqs['affection']]" size 13 color "#ff6699"
+                                        text "Trust: [reqs['trust']]" size 13 color "#66ccff"
+                                        text "Respect: [reqs['respect']]" size 13 color "#ffcc66"
 
 
 # =============================================================================
@@ -946,13 +971,11 @@ label lock_into_route(route_id, skip_confirmation=False):
 
 # Check if content should be shown based on route
 label check_route_content(route_id=None, flag=None):
-    """
-    Check if route-specific content should be shown.
-
-    Usage:
-        call check_route_content("elena")  # Check if on Elena's route
-        call check_route_content(flag="romance_scene")  # Check for flag
-    """
+    # Check if route-specific content should be shown.
+    #
+    # Usage:
+    #     call check_route_content("elena")  # Check if on Elena's route
+    #     call check_route_content(flag="romance_scene")  # Check for flag
     if route_id:
         $ result = route_manager.get_current_route_id() == route_id
         return result
@@ -967,7 +990,8 @@ label check_route_content(route_id=None, flag=None):
 # =============================================================================
 
 # Initialize example routes when appropriate
-label after_load:
+# Note: Call setup_example_routes() from your main after_load or splashscreen label
+label routes_init:
     if not route_manager.routes:
         $ setup_example_routes()
     return

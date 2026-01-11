@@ -474,7 +474,7 @@ init python:
 # =============================================================================
 
 screen phone_screen():
-    """Main phone screen - shows contacts or conversation based on state."""
+#    Main phone screen - shows contacts or conversation based on state.
 
     tag menu
     modal True
@@ -544,7 +544,7 @@ screen phone_screen():
 
 
 screen phone_contacts_list():
-    """Contact list view for the phone."""
+#    Contact list view for the phone.
 
     viewport:
         xfill True
@@ -620,7 +620,7 @@ screen phone_contacts_list():
 
 
 screen phone_conversation_view():
-    """Conversation view showing messages with a contact."""
+#    Conversation view showing messages with a contact.
 
     vbox:
         spacing 0
@@ -672,7 +672,7 @@ screen phone_conversation_view():
 
 
 screen phone_message_bubble(msg):
-    """Individual message bubble."""
+#    Individual message bubble.
 
     $ is_player = msg.is_from_player()
 

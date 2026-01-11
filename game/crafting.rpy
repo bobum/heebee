@@ -664,152 +664,169 @@ default selected_recipe = None
 screen crafting_menu():
     tag menu
 
-    use game_menu(_("Crafting"), scroll="viewport"):
-
-        style_prefix "crafting"
+    frame:
+        xfill True
+        yfill True
+        background "#1a1a1a"
+        padding (40, 40)
 
         vbox:
             spacing 20
+            xfill True
+            yfill True
 
-            # Category filter buttons
+            # Title bar with close button
             hbox:
-                spacing 10
-                text "Categories:" size 18 color "#aaaaaa" yalign 0.5
+                xfill True
+                text _("Crafting") size 36 color "#ffffff"
+                textbutton _("Return") action Return() align (1.0, 0.5)
 
-                textbutton "All" action SetVariable("crafting_category_filter", None):
-                    style "crafting_category_button"
+            style_prefix "crafting"
 
-                for cat in crafting_manager.get_categories():
-                    textbutton cat.title() action SetVariable("crafting_category_filter", cat):
-                        style "crafting_category_button"
-
-            null height 10
-
-            # Main content area
-            hbox:
+            vbox:
                 spacing 20
 
-                # Recipe list (left side)
-                frame:
-                    xsize 350
-                    ysize 500
-                    background "#2a2a2a"
-                    padding (15, 15)
+                # Category filter buttons
+                hbox:
+                    spacing 10
+                    text "Categories:" size 18 color "#aaaaaa" yalign 0.5
 
-                    vbox:
-                        spacing 5
+                    textbutton "All" action SetVariable("crafting_category_filter", None):
+                        style "crafting_category_button"
 
-                        text "Available Recipes" size 22 color "#ffffff"
-                        null height 10
+                    for cat in crafting_manager.get_categories():
+                        textbutton cat.title() action SetVariable("crafting_category_filter", cat):
+                            style "crafting_category_button"
 
-                        viewport:
-                            ysize 420
-                            scrollbars "vertical"
-                            mousewheel True
+                null height 10
 
-                            vbox:
-                                spacing 8
+                # Main content area
+                hbox:
+                    spacing 20
 
-                                for recipe in crafting_manager.get_unlocked_recipes():
-                                    if not defined("crafting_category_filter") or crafting_category_filter is None or recipe.category == crafting_category_filter:
-                                        $ can_craft = crafting_manager.can_craft(recipe.id)
-                                        $ btn_color = "#3a5a3a" if can_craft else "#3a3a3a"
-                                        $ text_color = "#ffffff" if can_craft else "#888888"
+                    # Recipe list (left side)
+                    frame:
+                        xsize 350
+                        ysize 500
+                        background "#2a2a2a"
+                        padding (15, 15)
 
-                                        button:
-                                            xfill True
-                                            background btn_color
-                                            hover_background "#4a6a4a" if can_craft else "#4a4a4a"
-                                            padding (10, 8)
-                                            action SetVariable("selected_recipe", recipe.id)
+                        vbox:
+                            spacing 5
 
-                                            hbox:
-                                                spacing 10
-                                                text recipe.name size 16 color text_color
-                                                if can_craft:
-                                                    text "(Ready)" size 14 color "#88ff88" xalign 1.0
+                            text "Available Recipes" size 22 color "#ffffff"
+                            null height 10
 
-                # Recipe details (right side)
-                frame:
-                    xsize 400
-                    ysize 500
-                    background "#2a2a2a"
-                    padding (20, 20)
+                            viewport:
+                                ysize 420
+                                scrollbars "vertical"
+                                mousewheel True
 
-                    if selected_recipe:
-                        $ recipe = crafting_manager.get_recipe(selected_recipe)
-                        if recipe:
-                            vbox:
-                                spacing 15
+                                vbox:
+                                    spacing 8
 
-                                # Recipe name and category
-                                text recipe.name size 26 color "#ffffff"
-                                text "[" + recipe.category.title() + "]" size 14 color "#888888"
+                                    for recipe in crafting_manager.get_unlocked_recipes():
+                                        if not defined("crafting_category_filter") or crafting_category_filter is None or recipe.category == crafting_category_filter:
+                                            $ can_craft = crafting_manager.can_craft(recipe.id)
+                                            $ btn_color = "#3a5a3a" if can_craft else "#3a3a3a"
+                                            $ text_color = "#ffffff" if can_craft else "#888888"
+                                            $ hover_bg = "#4a6a4a" if can_craft else "#4a4a4a"
 
-                                null height 5
+                                            button:
+                                                xfill True
+                                                background btn_color
+                                                hover_background hover_bg
+                                                padding (10, 8)
+                                                action SetVariable("selected_recipe", recipe.id)
 
-                                # Description
-                                text recipe.description size 16 color "#cccccc"
+                                                hbox:
+                                                    spacing 10
+                                                    text recipe.name size 16 color text_color
+                                                    if can_craft:
+                                                        text "(Ready)" size 14 color "#88ff88" xalign 1.0
 
-                                null height 10
+                    # Recipe details (right side)
+                    frame:
+                        xsize 400
+                        ysize 500
+                        background "#2a2a2a"
+                        padding (20, 20)
 
-                                # Ingredients section
-                                text "Ingredients:" size 18 color "#ffcc66"
-
-                                frame:
-                                    xfill True
-                                    background "#1a1a1a"
-                                    padding (15, 10)
-
-                                    vbox:
-                                        spacing 5
-                                        for item_id, qty in recipe.ingredients.items():
-                                            $ have = crafting_manager.get_inventory().get(item_id, 0)
-                                            $ has_enough = have >= qty
-                                            $ color = "#88ff88" if has_enough else "#ff8888"
-
-                                            hbox:
-                                                text get_item_name(item_id) size 16 color "#ffffff" min_width 150
-                                                text "[have]/[qty]" size 16 color color
-
-                                null height 10
-
-                                # Result section
-                                text "Result:" size 18 color "#66ccff"
-
-                                frame:
-                                    xfill True
-                                    background "#1a1a1a"
-                                    padding (15, 10)
-
-                                    hbox:
-                                        text get_item_name(recipe.result_item) size 16 color "#ffffff"
-                                        text " x[recipe.result_quantity]" size 16 color "#aaaaaa"
-
-                                null height 15
-
-                                # Craft button
-                                $ can_craft = crafting_manager.can_craft(recipe.id)
-                                $ max_craft = crafting_manager.get_max_craftable(recipe.id)
-
-                                hbox:
+                        if selected_recipe:
+                            $ recipe = crafting_manager.get_recipe(selected_recipe)
+                            if recipe:
+                                vbox:
                                     spacing 15
 
-                                    textbutton "Craft" action Function(do_craft, recipe.id):
-                                        sensitive can_craft
-                                        style "crafting_craft_button"
+                                    # Recipe name and category
+                                    text recipe.name size 26 color "#ffffff"
+                                    $ cat_display = "[" + recipe.category.title() + "]"
+                                    text cat_display size 14 color "#888888"
 
-                                    if max_craft > 1:
-                                        textbutton "Craft All ([max_craft])" action Function(do_craft_all, recipe.id):
+                                    null height 5
+
+                                    # Description
+                                    text recipe.description size 16 color "#cccccc"
+
+                                    null height 10
+
+                                    # Ingredients section
+                                    text "Ingredients:" size 18 color "#ffcc66"
+
+                                    frame:
+                                        xfill True
+                                        background "#1a1a1a"
+                                        padding (15, 10)
+
+                                        vbox:
+                                            spacing 5
+                                            for item_id, qty in recipe.ingredients.items():
+                                                $ have = crafting_manager.get_inventory().get(item_id, 0)
+                                                $ has_enough = have >= qty
+                                                $ ing_color = "#88ff88" if has_enough else "#ff8888"
+
+                                                hbox:
+                                                    text get_item_name(item_id) size 16 color "#ffffff" min_width 150
+                                                    text "[have]/[qty]" size 16 color ing_color
+
+                                    null height 10
+
+                                    # Result section
+                                    text "Result:" size 18 color "#66ccff"
+
+                                    frame:
+                                        xfill True
+                                        background "#1a1a1a"
+                                        padding (15, 10)
+
+                                        hbox:
+                                            text get_item_name(recipe.result_item) size 16 color "#ffffff"
+                                            text " x[recipe.result_quantity]" size 16 color "#aaaaaa"
+
+                                    null height 15
+
+                                    # Craft button
+                                    $ can_craft = crafting_manager.can_craft(recipe.id)
+                                    $ max_craft = crafting_manager.get_max_craftable(recipe.id)
+
+                                    hbox:
+                                        spacing 15
+
+                                        textbutton "Craft" action Function(do_craft, recipe.id):
                                             sensitive can_craft
                                             style "crafting_craft_button"
 
-                    else:
-                        vbox:
-                            yalign 0.5
-                            xalign 0.5
-                            text "Select a recipe" size 20 color "#666666"
-                            text "to view details" size 16 color "#444444"
+                                        if max_craft > 1:
+                                            textbutton "Craft All ([max_craft])" action Function(do_craft_all, recipe.id):
+                                                sensitive can_craft
+                                                style "crafting_craft_button"
+
+                        else:
+                            vbox:
+                                yalign 0.5
+                                xalign 0.5
+                                text "Select a recipe" size 20 color "#666666"
+                                text "to view details" size 16 color "#444444"
 
 # =============================================================================
 # CRAFTING UI HELPER FUNCTIONS
@@ -839,29 +856,50 @@ default crafting_category_filter = None
 screen inventory_screen():
     tag menu
 
-    use game_menu(_("Inventory"), scroll="viewport"):
-
-        style_prefix "inventory"
+    frame:
+        xfill True
+        yfill True
+        background "#1a1a1a"
+        padding (40, 40)
 
         vbox:
-            spacing 15
+            spacing 20
+            xfill True
+            yfill True
 
-            text "Your Items" size 28 color "#ffffff"
+            # Title bar with close button
+            hbox:
+                xfill True
+                text _("Inventory") size 36 color "#ffffff"
+                textbutton _("Return") action Return() align (1.0, 0.5)
 
-            null height 10
+            style_prefix "inventory"
 
-            if player_inventory:
-                for item_id, quantity in player_inventory.items():
-                    frame:
-                        xfill True
-                        background "#333333"
-                        padding (15, 10)
+            viewport:
+                scrollbars "vertical"
+                mousewheel True
+                xfill True
+                yfill True
 
-                        hbox:
-                            text get_item_name(item_id) size 18 color "#ffffff" min_width 200
-                            text "x[quantity]" size 18 color "#aaaaaa"
-            else:
-                text "Your inventory is empty." size 16 color "#888888"
+                vbox:
+                    spacing 15
+
+                    text "Your Items" size 28 color "#ffffff"
+
+                    null height 10
+
+                    if player_inventory:
+                        for item_id, quantity in player_inventory.items():
+                            frame:
+                                xfill True
+                                background "#333333"
+                                padding (15, 10)
+
+                                hbox:
+                                    text get_item_name(item_id) size 18 color "#ffffff" min_width 200
+                                    text "x[quantity]" size 18 color "#aaaaaa"
+                    else:
+                        text "Your inventory is empty." size 16 color "#888888"
 
 # =============================================================================
 # STYLES FOR CRAFTING SCREENS

@@ -211,65 +211,71 @@ init python:
 # Relationship display screen
 screen relationship_screen():
     tag menu
-    use game_menu(_("Relationships"), scroll="viewport"):
-        style_prefix "relationship"
+    frame:
+        xfill True
+        yfill True
+        padding (40, 40)
+        viewport:
+            scrollbars "vertical"
+            mousewheel True
+            style_prefix "relationship"
 
-        vbox:
-            spacing 20
+            vbox:
+                spacing 20
 
-            # Character relationships
-            text "Characters" size 28
+                # Character relationships
+                text "Characters" size 28
 
-            for char_id, rel in relationship_manager.relationships.items():
-                if rel.met:
+                for char_id, rel in relationship_manager.relationships.items():
+                    if rel.met:
+                        frame:
+                            padding (15, 10)
+                            vbox:
+                                spacing 5
+
+                                hbox:
+                                    text rel.name size 22 bold True
+                                    text " - [rel.get_status()]" size 18
+                                    if rel.romance_active:
+                                        text " ♥" color "#ff6b9d" size 22
+
+                                # Affection bar
+                                hbox:
+                                    text "Affection: " size 14
+                                    bar value rel.affection range 100 xmaximum 200
+                                    text " [rel.affection]%" size 14
+
+                                # Trust bar
+                                hbox:
+                                    text "Trust: " size 14
+                                    bar value rel.trust range 100 xmaximum 200
+                                    text " [rel.trust]%" size 14
+
+                                # Respect bar
+                                hbox:
+                                    text "Respect: " size 14
+                                    bar value rel.respect range 100 xmaximum 200
+                                    text " [rel.respect]%" size 14
+
+                null height 20
+
+                # Faction reputation
+                text "Factions" size 28
+
+                for faction_id, faction in relationship_manager.factions.items():
                     frame:
                         padding (15, 10)
                         vbox:
                             spacing 5
 
                             hbox:
-                                text rel.name size 22 bold True
-                                text " - [rel.get_status()]" size 18
-                                if rel.romance_active:
-                                    text " ♥" color "#ff6b9d" size 22
+                                text faction.name size 20 bold True
+                                text " - [faction.rank]" size 16
 
-                            # Affection bar
                             hbox:
-                                text "Affection: " size 14
-                                bar value rel.affection range 100 xmaximum 200
-                                text " [rel.affection]%" size 14
-
-                            # Trust bar
-                            hbox:
-                                text "Trust: " size 14
-                                bar value rel.trust range 100 xmaximum 200
-                                text " [rel.trust]%" size 14
-
-                            # Respect bar
-                            hbox:
-                                text "Respect: " size 14
-                                bar value rel.respect range 100 xmaximum 200
-                                text " [rel.respect]%" size 14
-
-            null height 20
-
-            # Faction reputation
-            text "Factions" size 28
-
-            for faction_id, faction in relationship_manager.factions.items():
-                frame:
-                    padding (15, 10)
-                    vbox:
-                        spacing 5
-
-                        hbox:
-                            text faction.name size 20 bold True
-                            text " - [faction.rank]" size 16
-
-                        hbox:
-                            text "Reputation: " size 14
-                            bar value (faction.reputation + 100) range 200 xmaximum 200
-                            text " [faction.reputation]" size 14
+                                text "Reputation: " size 14
+                                bar value (faction.reputation + 100) range 200 xmaximum 200
+                                text " [faction.reputation]" size 14
 
 style relationship_vbox:
     xfill True

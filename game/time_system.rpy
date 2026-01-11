@@ -521,7 +521,7 @@ init python:
 # Screens for the time system
 
 screen time_display():
-    """Display current time in corner of screen."""
+    # Display current time in corner of screen
     frame:
         xalign 1.0
         yalign 0.0
@@ -545,7 +545,8 @@ screen time_display():
                 color "#AAAAAA"
 
 screen energy_bar():
-    """Display player energy bar."""
+    # Display player energy bar
+    $ bar_color = "#00FF00" if time_manager.energy > time_manager.fatigue_threshold else "#FF0000"
     frame:
         xalign 0.0
         yalign 0.0
@@ -565,7 +566,7 @@ screen energy_bar():
                 range time_manager.max_energy
                 xsize 150
                 ysize 20
-                left_bar "#00FF00" if time_manager.energy > time_manager.fatigue_threshold else "#FF0000"
+                left_bar bar_color
                 right_bar "#333333"
 
             text "[time_manager.energy]/[time_manager.max_energy]":
@@ -574,7 +575,7 @@ screen energy_bar():
                 xalign 0.5
 
 screen calendar_screen():
-    """Calendar screen showing current date and upcoming events."""
+    # Calendar screen showing current date and upcoming events
     modal True
 
     frame:
@@ -630,11 +631,13 @@ screen calendar_screen():
 
                 for i, day_name in enumerate(DAYS_OF_WEEK):
                     $ is_today = (i == time_manager.day_of_week_index)
+                    $ day_bg = "#FFD700" if is_today else "#444444"
+                    $ day_color = "#000000" if is_today else "#FFFFFF"
 
                     frame:
                         xsize 80
                         ysize 60
-                        background "#FFD700" if is_today else "#444444"
+                        background day_bg
 
                         vbox:
                             xalign 0.5
@@ -642,7 +645,7 @@ screen calendar_screen():
 
                             text day_name[:3]:
                                 size 14
-                                color "#000000" if is_today else "#FFFFFF"
+                                color day_color
                                 xalign 0.5
 
             # Upcoming events
@@ -701,10 +704,12 @@ screen calendar_screen():
                         for deadline in active_deadlines:
                             $ days_left = deadline.days_remaining(time_manager.current_day)
                             $ is_warning = deadline.should_warn(time_manager.current_day)
+                            $ deadline_bg = "#660000" if is_warning else "#333333"
+                            $ deadline_color = "#FF0000" if is_warning else "#00FF00"
 
                             frame:
                                 xfill True
-                                background "#660000" if is_warning else "#333333"
+                                background deadline_bg
                                 xpadding 10
                                 ypadding 5
 
@@ -716,14 +721,14 @@ screen calendar_screen():
 
                                     text "[days_left] days left":
                                         size 14
-                                        color "#FF0000" if is_warning else "#00FF00"
+                                        color deadline_color
                     else:
                         text "No active deadlines.":
                             size 14
                             color "#888888"
 
 screen time_actions():
-    """Screen with time-related actions."""
+    # Screen with time-related actions
     frame:
         xalign 0.5
         yalign 1.0
