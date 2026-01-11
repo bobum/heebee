@@ -95,6 +95,8 @@ def load_rpy_classes(rpy_path: Path, namespace: dict = None) -> dict:
     # Add common imports that Ren'Py provides
     namespace['renpy'] = MockRenpy()
     namespace['persistent'] = MockPersistent()
+    namespace['Action'] = MockAction
+    namespace['config'] = MockConfig()
 
     python_code = extract_python_from_rpy(rpy_path)
 
@@ -120,6 +122,21 @@ class MockMusic:
 
     def get_playing(self, *args, **kwargs):
         return None
+
+
+class MockAction:
+    """Mock Ren'Py Action class for testing."""
+
+    def __call__(self):
+        pass
+
+    def get_sensitive(self):
+        return True
+
+
+class MockConfig:
+    """Mock Ren'Py config object."""
+    gamedir = "/mock/game/dir"
 
 
 class MockRenpy:
