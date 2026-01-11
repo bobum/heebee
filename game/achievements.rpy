@@ -94,7 +94,7 @@ init python:
             self.unlocked = data.get("unlocked", False)
             unlock_date_str = data.get("unlock_date")
             if unlock_date_str:
-                self.unlock_date = datetime.fromisoformat(unlock_date_str)
+                self.unlock_date = dt.datetime.fromisoformat(unlock_date_str)
 
     # =========================================================================
     # PROGRESS ACHIEVEMENT CLASS - For achievements with progress tracking
