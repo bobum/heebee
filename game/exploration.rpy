@@ -1,883 +1,492 @@
-# exploration.rpy
-# Point-and-Click Exploration System for Ren'Py
-# This module provides a complete exploration framework with locations, hotspots, and items.
-
-# ============================================================================
-# PYTHON CLASSES AND EXPLORATION MANAGER
-# ============================================================================
+# Point-and-Click Exploration System for Heebee
+# Imagemaps with clickable hotspots, location navigation, and discovery
 
 init python:
-    import pygame
-
     class Hotspot:
-        """
-        Represents a clickable area in a location.
-
-        Attributes:
-            id: Unique identifier for this hotspot
-            position: Tuple (x, y) for the top-left corner
-            size: Tuple (width, height) of the clickable area
-            action: The action to perform when clicked (string label or callable)
-            hover_text: Text to display when hovering over this hotspot
-            required_item: Item ID required to interact (None if no requirement)
-            visible: Whether this hotspot is currently visible
-            visible_condition: A callable that returns True if hotspot should be visible
-            one_time: If True, hotspot disappears after first interaction
-            interacted: Whether this hotspot has been interacted with
-        """
-        def __init__(self, id, position, size, action, hover_text="",
-                     required_item=None, visible=True, visible_condition=None,
-                     one_time=False):
-            self.id = id
-            self.position = position
-            self.size = size
-            self.action = action
-            self.hover_text = hover_text
-            self.required_item = required_item
-            self.visible = visible
-            self.visible_condition = visible_condition
-            self.one_time = one_time
+        """Represents a clickable area in a location"""
+        def __init__(self, hotspot_id, name, x, y, width, height, **kwargs):
+            self.id = hotspot_id
+            self.name = name
+            self.x = x
+            self.y = y
+            self.width = width
+            self.height = height
+            self.description = kwargs.get("description", "")
+            self.interaction_label = kwargs.get("interaction_label", None)
+            self.required_item = kwargs.get("required_item", None)
+            self.gives_item = kwargs.get("gives_item", None)
+            self.one_time = kwargs.get("one_time", False)
             self.interacted = False
+            self.visible = kwargs.get("visible", True)
+            self.enabled = kwargs.get("enabled", True)
+            self.hover_text = kwargs.get("hover_text", name)
+            self.destination = kwargs.get("destination", None)  # For exits
 
         def get_rect(self):
-            """Returns a pygame Rect for collision detection."""
-            return pygame.Rect(self.position[0], self.position[1],
-                             self.size[0], self.size[1])
+            """Get rectangle tuple for imagemap"""
+            return (self.x, self.y, self.x + self.width, self.y + self.height)
 
-        def is_visible(self):
-            """Check if hotspot should be visible based on conditions."""
-            if not self.visible:
+        def can_interact(self, inventory=None):
+            """Check if player can interact with this hotspot"""
+            if not self.visible or not self.enabled:
                 return False
             if self.one_time and self.interacted:
                 return False
-            if self.visible_condition is not None:
-                return self.visible_condition()
+            if self.required_item and inventory:
+                if not inventory.has_item(self.required_item):
+                    return False
             return True
 
-        def can_interact(self, inventory):
-            """Check if player can interact with this hotspot."""
-            if self.required_item is None:
-                return True
-            return self.required_item in inventory
+        def interact(self, inventory=None):
+            """Perform interaction, return label to call or None"""
+            if not self.can_interact(inventory):
+                return None
+
+            self.interacted = True
+
+            # Give item if configured
+            if self.gives_item and inventory:
+                inventory.add_item(self.gives_item)
+
+            return self.interaction_label
 
     class Location:
-        """
-        Represents an explorable location in the game.
-
-        Attributes:
-            id: Unique identifier for this location
-            name: Display name of the location
-            background: Image path for the background
-            hotspots: List of Hotspot objects in this location
-            items: List of item IDs that can be picked up here
-            exits: Dict mapping direction names to location IDs
-            discovered: Whether the player has visited this location
-            ambient_sound: Optional ambient sound file to play
-            on_enter: Optional callback when entering location
-            on_exit: Optional callback when leaving location
-        """
-        def __init__(self, id, name, background, hotspots=None, items=None,
-                     exits=None, ambient_sound=None, on_enter=None, on_exit=None):
-            self.id = id
+        """Represents a location that can be explored"""
+        def __init__(self, location_id, name, background, **kwargs):
+            self.id = location_id
             self.name = name
-            self.background = background
-            self.hotspots = hotspots if hotspots is not None else []
-            self.items = items if items is not None else []
-            self.exits = exits if exits is not None else {}
-            self.discovered = False
-            self.ambient_sound = ambient_sound
-            self.on_enter = on_enter
-            self.on_exit = on_exit
+            self.background = background  # Image path
+            self.hotspots = {}
+            self.description = kwargs.get("description", "")
+            self.ambient_sound = kwargs.get("ambient_sound", None)
+            self.music = kwargs.get("music", None)
+            self.discovered = kwargs.get("discovered", False)
+            self.accessible = kwargs.get("accessible", True)
+            self.visited_count = 0
+            self.connected_locations = []  # List of location IDs
+            self.entry_label = kwargs.get("entry_label", None)
+            self.exit_label = kwargs.get("exit_label", None)
+            self.idle_animation = kwargs.get("idle_animation", None)
 
         def add_hotspot(self, hotspot):
-            """Add a hotspot to this location."""
-            self.hotspots.append(hotspot)
+            """Add a hotspot to this location"""
+            self.hotspots[hotspot.id] = hotspot
 
         def remove_hotspot(self, hotspot_id):
-            """Remove a hotspot by ID."""
-            self.hotspots = [h for h in self.hotspots if h.id != hotspot_id]
+            """Remove a hotspot"""
+            if hotspot_id in self.hotspots:
+                del self.hotspots[hotspot_id]
 
         def get_hotspot(self, hotspot_id):
-            """Get a hotspot by ID."""
-            for h in self.hotspots:
-                if h.id == hotspot_id:
-                    return h
-            return None
-
-        def add_item(self, item_id):
-            """Add an item to this location."""
-            if item_id not in self.items:
-                self.items.append(item_id)
-
-        def remove_item(self, item_id):
-            """Remove an item from this location."""
-            if item_id in self.items:
-                self.items.remove(item_id)
+            """Get a specific hotspot"""
+            return self.hotspots.get(hotspot_id)
 
         def get_visible_hotspots(self):
-            """Get all currently visible hotspots."""
-            return [h for h in self.hotspots if h.is_visible()]
+            """Get all visible hotspots"""
+            return [h for h in self.hotspots.values() if h.visible]
+
+        def connect_to(self, location_id):
+            """Connect this location to another"""
+            if location_id not in self.connected_locations:
+                self.connected_locations.append(location_id)
+
+        def visit(self):
+            """Mark location as visited"""
+            self.visited_count += 1
+            self.discovered = True
 
     class ExplorationManager:
-        """
-        Manages the exploration system including locations, inventory, and navigation.
-
-        Attributes:
-            locations: Dict mapping location IDs to Location objects
-            current_location: Currently active Location object
-            discovered_locations: Set of discovered location IDs
-            inventory: List of item IDs in player's inventory
-            examined_objects: Set of object IDs that have been examined
-            tooltip_text: Current tooltip text to display
-            selected_item: Currently selected inventory item for use
-        """
+        """Manages all locations and exploration state"""
         def __init__(self):
             self.locations = {}
             self.current_location = None
-            self.discovered_locations = set()
-            self.inventory = []
-            self.examined_objects = set()
-            self.tooltip_text = ""
-            self.selected_item = None
+            self.previous_location = None
+            self.discovered_items = []
+            self.exploration_progress = {}
 
-        def register_location(self, location):
-            """Register a location with the manager."""
+        def add_location(self, location):
+            """Add a location to the world"""
             self.locations[location.id] = location
 
         def get_location(self, location_id):
-            """Get a location by ID."""
+            """Get a location by ID"""
             return self.locations.get(location_id)
 
-        def move_to_location(self, location_id):
-            """
-            Move the player to a new location.
-            Returns True if successful, False otherwise.
-            """
+        def travel_to(self, location_id):
+            """Travel to a new location"""
             if location_id not in self.locations:
                 return False
 
-            # Call on_exit for current location
-            if self.current_location and self.current_location.on_exit:
-                self.current_location.on_exit()
-
-            # Update current location
-            new_location = self.locations[location_id]
-            self.current_location = new_location
-
-            # Mark as discovered
-            new_location.discovered = True
-            self.discovered_locations.add(location_id)
-
-            # Call on_enter for new location
-            if new_location.on_enter:
-                new_location.on_enter()
-
-            # Clear tooltip
-            self.tooltip_text = ""
-
-            return True
-
-        def interact_with_hotspot(self, hotspot_id):
-            """
-            Interact with a hotspot in the current location.
-            Returns the action to perform, or None if interaction not possible.
-            """
-            if not self.current_location:
-                return None
-
-            hotspot = self.current_location.get_hotspot(hotspot_id)
-            if not hotspot or not hotspot.is_visible():
-                return None
-
-            if not hotspot.can_interact(self.inventory):
-                return ("need_item", hotspot.required_item)
-
-            # Mark as interacted
-            hotspot.interacted = True
-
-            # Consume required item if specified
-            if hotspot.required_item and hotspot.required_item in self.inventory:
-                # Note: We don't automatically consume items - the action can do that
-                pass
-
-            return ("success", hotspot.action)
-
-        def examine(self, object_id, description=""):
-            """
-            Examine an object, marking it as examined.
-            Returns the description.
-            """
-            self.examined_objects.add(object_id)
-            return description
-
-        def has_examined(self, object_id):
-            """Check if an object has been examined."""
-            return object_id in self.examined_objects
-
-        def pick_up_item(self, item_id):
-            """
-            Pick up an item from the current location.
-            Returns True if successful, False otherwise.
-            """
-            if not self.current_location:
+            location = self.locations[location_id]
+            if not location.accessible:
                 return False
 
-            if item_id not in self.current_location.items:
-                return False
-
-            # Remove from location and add to inventory
-            self.current_location.remove_item(item_id)
-            if item_id not in self.inventory:
-                self.inventory.append(item_id)
-
+            self.previous_location = self.current_location
+            self.current_location = location_id
+            location.visit()
             return True
 
-        def has_item(self, item_id):
-            """Check if player has an item in inventory."""
-            return item_id in self.inventory
+        def get_current_location(self):
+            """Get the current location object"""
+            if self.current_location:
+                return self.locations.get(self.current_location)
+            return None
 
-        def remove_item(self, item_id):
-            """Remove an item from inventory."""
-            if item_id in self.inventory:
-                self.inventory.remove(item_id)
-                if self.selected_item == item_id:
-                    self.selected_item = None
-                return True
-            return False
-
-        def select_item(self, item_id):
-            """Select an item for use."""
-            if item_id in self.inventory:
-                self.selected_item = item_id
-                return True
-            return False
-
-        def deselect_item(self):
-            """Deselect the currently selected item."""
-            self.selected_item = None
-
-        def set_tooltip(self, text):
-            """Set the current tooltip text."""
-            self.tooltip_text = text
-
-        def clear_tooltip(self):
-            """Clear the tooltip text."""
-            self.tooltip_text = ""
+        def get_connected_locations(self):
+            """Get locations connected to current location"""
+            current = self.get_current_location()
+            if not current:
+                return []
+            return [self.locations[loc_id] for loc_id in current.connected_locations
+                    if loc_id in self.locations and self.locations[loc_id].accessible]
 
         def get_discovered_locations(self):
-            """Get all discovered locations for fast travel."""
-            return [self.locations[lid] for lid in self.discovered_locations
-                    if lid in self.locations]
+            """Get all discovered locations"""
+            return [loc for loc in self.locations.values() if loc.discovered]
 
-        def can_fast_travel_to(self, location_id):
-            """Check if player can fast travel to a location."""
-            return location_id in self.discovered_locations
+        def unlock_location(self, location_id):
+            """Make a location accessible"""
+            if location_id in self.locations:
+                self.locations[location_id].accessible = True
+                self.locations[location_id].discovered = True
 
-# ============================================================================
-# GLOBAL EXPLORATION MANAGER INSTANCE
-# ============================================================================
+        def lock_location(self, location_id):
+            """Make a location inaccessible"""
+            if location_id in self.locations:
+                self.locations[location_id].accessible = False
 
+# Initialize exploration system
 default exploration_manager = ExplorationManager()
 
-# ============================================================================
-# ITEM DEFINITIONS
-# ============================================================================
+# Setup example locations
+init python:
+    def setup_exploration():
+        em = exploration_manager
 
-# Define items with their display names and descriptions
-define item_data = {
-    "old_key": {
-        "name": "Old Key",
-        "description": "A rusty old key. It looks like it might open an antique lock.",
-        "icon": "gui/items/old_key.png"
-    },
-    "flashlight": {
-        "name": "Flashlight",
-        "description": "A battery-powered flashlight. Still works!",
-        "icon": "gui/items/flashlight.png"
-    },
-    "mysterious_note": {
-        "name": "Mysterious Note",
-        "description": "A crumpled note with strange symbols.",
-        "icon": "gui/items/note.png"
-    },
-    "garden_flower": {
-        "name": "Garden Flower",
-        "description": "A beautiful flower from the garden. Someone might appreciate this.",
-        "icon": "gui/items/flower.png"
-    },
-    "ancient_book": {
-        "name": "Ancient Book",
-        "description": "A leather-bound book with arcane symbols on the cover.",
-        "icon": "gui/items/book.png"
-    }
-}
+        # Create town square location
+        town_square = Location(
+            "town_square",
+            "Town Square",
+            "images/locations/town_square.png",
+            description="The bustling center of town.",
+            discovered=True
+        )
+        town_square.add_hotspot(Hotspot(
+            "fountain", "Fountain", 400, 300, 200, 150,
+            description="A beautiful stone fountain.",
+            hover_text="Examine the fountain",
+            interaction_label="examine_fountain"
+        ))
+        town_square.add_hotspot(Hotspot(
+            "notice_board", "Notice Board", 100, 200, 80, 120,
+            description="A board full of postings.",
+            hover_text="Read the notices",
+            interaction_label="read_notices"
+        ))
+        town_square.add_hotspot(Hotspot(
+            "to_market", "To Market", 700, 400, 100, 200,
+            description="Path to the market district.",
+            hover_text="Go to Market",
+            destination="market"
+        ))
+        town_square.add_hotspot(Hotspot(
+            "to_tavern", "To Tavern", 50, 400, 100, 200,
+            description="The local tavern entrance.",
+            hover_text="Enter the Tavern",
+            destination="tavern"
+        ))
+        em.add_location(town_square)
 
-# ============================================================================
-# PLACEHOLDER BACKGROUNDS FOR EXPLORATION
-# ============================================================================
+        # Create market location
+        market = Location(
+            "market",
+            "Market District",
+            "images/locations/market.png",
+            description="Stalls and shops line the streets."
+        )
+        market.add_hotspot(Hotspot(
+            "weapon_shop", "Weapon Shop", 200, 250, 150, 200,
+            description="A shop selling weapons and armor.",
+            hover_text="Enter Weapon Shop",
+            interaction_label="enter_weapon_shop"
+        ))
+        market.add_hotspot(Hotspot(
+            "potion_stall", "Potion Stall", 500, 300, 100, 150,
+            description="A stall selling potions and remedies.",
+            hover_text="Browse Potions",
+            interaction_label="browse_potions"
+        ))
+        market.add_hotspot(Hotspot(
+            "hidden_coin", "Shiny Object", 650, 450, 30, 30,
+            description="Something shiny on the ground.",
+            hover_text="Pick up",
+            gives_item="gold_coin",
+            one_time=True,
+            visible=True
+        ))
+        market.add_hotspot(Hotspot(
+            "to_town_square", "To Town Square", 400, 500, 200, 100,
+            hover_text="Return to Town Square",
+            destination="town_square"
+        ))
+        em.add_location(market)
 
-image bg_explore_room = Solid("#3a3a4e")
-image bg_explore_hallway = Solid("#4a3a3a")
-image bg_explore_garden = Solid("#2a4a2a")
+        # Create tavern location
+        tavern = Location(
+            "tavern",
+            "The Rusty Anchor Tavern",
+            "images/locations/tavern.png",
+            description="A cozy tavern filled with travelers."
+        )
+        tavern.add_hotspot(Hotspot(
+            "bartender", "Bartender", 350, 200, 100, 200,
+            description="The friendly bartender.",
+            hover_text="Talk to Bartender",
+            interaction_label="talk_bartender"
+        ))
+        tavern.add_hotspot(Hotspot(
+            "mysterious_stranger", "Hooded Figure", 600, 300, 80, 150,
+            description="A mysterious figure in the corner.",
+            hover_text="Approach the stranger",
+            interaction_label="approach_stranger"
+        ))
+        tavern.add_hotspot(Hotspot(
+            "fireplace", "Fireplace", 100, 250, 120, 180,
+            description="A warm, crackling fireplace.",
+            hover_text="Warm yourself",
+            interaction_label="use_fireplace"
+        ))
+        tavern.add_hotspot(Hotspot(
+            "exit_tavern", "Exit", 400, 500, 200, 100,
+            hover_text="Leave the Tavern",
+            destination="town_square"
+        ))
+        em.add_location(tavern)
 
-# Hotspot highlight overlay (for debug/development)
-image hotspot_highlight = Solid("#ffff0044")
+        # Connect locations
+        town_square.connect_to("market")
+        town_square.connect_to("tavern")
+        market.connect_to("town_square")
+        tavern.connect_to("town_square")
 
-# ============================================================================
-# EXPLORATION SCREEN
-# ============================================================================
+        # Set starting location
+        em.travel_to("town_square")
 
-screen exploration():
+# Main exploration screen
+screen exploration_screen():
     tag exploration
-    modal True
 
-    # Background
-    if exploration_manager.current_location:
-        add exploration_manager.current_location.background
+    # Get current location
+    $ current_loc = exploration_manager.get_current_location()
 
-    # Location name display
-    if exploration_manager.current_location:
+    if current_loc:
+        # Background image
+        add current_loc.background
+
+        # Location name
         frame:
             xalign 0.5
             yalign 0.02
             padding (20, 10)
-            background Solid("#000000aa")
-            text exploration_manager.current_location.name:
-                size 28
-                color "#ffffff"
+            text current_loc.name size 28 bold True
 
-    # Clickable hotspots
-    if exploration_manager.current_location:
-        for hotspot in exploration_manager.current_location.get_visible_hotspots():
-            button:
-                xpos hotspot.position[0]
-                ypos hotspot.position[1]
-                xsize hotspot.size[0]
-                ysize hotspot.size[1]
-                background Solid("#ffffff11")
-                hover_background Solid("#ffffff33")
-                action Function(handle_hotspot_click, hotspot.id)
-                hovered Function(exploration_manager.set_tooltip, hotspot.hover_text)
-                unhovered Function(exploration_manager.clear_tooltip)
+        # Hotspots as buttons
+        for hotspot_id, hotspot in current_loc.hotspots.items():
+            if hotspot.visible:
+                $ rect = hotspot.get_rect()
+                button:
+                    xpos rect[0]
+                    ypos rect[1]
+                    xsize hotspot.width
+                    ysize hotspot.height
+                    action Return(("hotspot", hotspot_id))
+                    tooltip hotspot.hover_text
 
-                # Visual indicator that something is here
-                add Solid("#ffffff22"):
-                    xsize hotspot.size[0]
-                    ysize hotspot.size[1]
+                    # Visual indicator (semi-transparent)
+                    if hotspot.enabled:
+                        background "#ffffff20"
+                        hover_background "#ffffff40"
+                    else:
+                        background "#ff000020"
 
-    # Exit buttons
-    if exploration_manager.current_location:
-        for direction, target_id in exploration_manager.current_location.exits.items():
-            $ exit_pos = get_exit_position(direction)
-            button:
-                xpos exit_pos[0]
-                ypos exit_pos[1]
-                padding (15, 10)
-                background Solid("#333366cc")
-                hover_background Solid("#4444aacc")
-                action Function(exploration_manager.move_to_location, target_id)
-                hovered Function(exploration_manager.set_tooltip, "Go to " + direction)
-                unhovered Function(exploration_manager.clear_tooltip)
-
-                text direction.capitalize():
-                    size 18
-                    color "#ffffff"
-
-    # Tooltip display
-    if exploration_manager.tooltip_text:
-        frame:
-            xalign 0.5
-            yalign 0.92
-            padding (20, 10)
-            background Solid("#000000dd")
-            text exploration_manager.tooltip_text:
-                size 22
-                color "#ffff88"
-
-    # Inventory bar at bottom
-    hbox:
-        xalign 0.5
-        yalign 0.99
-        spacing 10
-
-        for item_id in exploration_manager.inventory:
-            $ item_info = item_data.get(item_id, {"name": item_id, "icon": None})
-            button:
-                xsize 60
-                ysize 60
-                background Solid("#444444cc") if exploration_manager.selected_item != item_id else Solid("#666688cc")
-                hover_background Solid("#555555cc")
-                action Function(toggle_item_selection, item_id)
-                hovered Function(exploration_manager.set_tooltip, item_info.get("name", item_id))
-                unhovered Function(exploration_manager.clear_tooltip)
-
-                text item_id[:3].upper():
-                    xalign 0.5
-                    yalign 0.5
-                    size 14
-                    color "#ffffff"
-
-    # Control buttons
-    hbox:
-        xalign 0.98
-        yalign 0.02
-        spacing 10
-
-        textbutton "Map":
-            text_size 18
-            action ShowMenu("location_map")
-
-        textbutton "Exit":
-            text_size 18
-            action Return()
-
-# ============================================================================
-# LOCATION MAP / FAST TRAVEL SCREEN
-# ============================================================================
-
-screen location_map():
-    tag menu
-    modal True
-
-    add Solid("#1a1a2e")
-
-    frame:
-        xalign 0.5
-        yalign 0.5
-        padding (40, 40)
-        background Solid("#2a2a4e")
-
-        vbox:
-            spacing 20
-
-            text "Location Map" xalign 0.5 size 36 color "#66aaff"
-
-            null height 20
-
-            text "Discovered Locations:" xalign 0.5 size 24 color "#aaaaaa"
-
-            null height 10
-
-            # List of discovered locations
-            vbox:
-                spacing 10
-                xalign 0.5
-
-                for location in exploration_manager.get_discovered_locations():
-                    $ is_current = (exploration_manager.current_location and
-                                   exploration_manager.current_location.id == location.id)
-                    button:
-                        xsize 300
-                        padding (20, 10)
-                        background Solid("#333355") if not is_current else Solid("#555577")
-                        hover_background Solid("#4444aa")
-                        action [
-                            Function(exploration_manager.move_to_location, location.id),
-                            Hide("location_map")
-                        ] if not is_current else NullAction()
-
-                        hbox:
-                            spacing 10
-                            text location.name:
-                                size 20
-                                color "#ffffff" if not is_current else "#88ff88"
-                            if is_current:
-                                text "(Current)" size 16 color "#88ff88" yalign 0.5
-
-            null height 20
-
-            textbutton "Close" action Hide("location_map") xalign 0.5
-
-# ============================================================================
-# ITEM EXAMINATION SCREEN
-# ============================================================================
-
-screen examine_item(item_id):
-    tag menu
-    modal True
-
-    $ item_info = item_data.get(item_id, {"name": item_id, "description": "No description available."})
-
-    add Solid("#00000099")
-
-    frame:
-        xalign 0.5
-        yalign 0.5
-        padding (40, 40)
-        background Solid("#2a2a4e")
-        xsize 500
-
-        vbox:
-            spacing 20
-
-            text item_info.get("name", item_id):
-                xalign 0.5
-                size 32
-                color "#ffcc66"
-
-            null height 10
-
-            # Item icon placeholder
+        # Tooltip display
+        $ tooltip_text = GetTooltip()
+        if tooltip_text:
             frame:
                 xalign 0.5
-                xsize 100
-                ysize 100
-                background Solid("#444444")
+                yalign 0.95
+                padding (15, 8)
+                text tooltip_text size 18
 
-                text item_id[:3].upper():
-                    xalign 0.5
-                    yalign 0.5
-                    size 24
-                    color "#ffffff"
+        # Navigation buttons
+        hbox:
+            xalign 0.02
+            yalign 0.98
+            spacing 10
 
-            null height 10
+            textbutton "Map" action Return(("map", None))
+            textbutton "Inventory" action Return(("inventory", None))
+            textbutton "Back" action Return(("back", None))
 
-            text item_info.get("description", ""):
-                xalign 0.5
-                size 20
-                color "#cccccc"
-                text_align 0.5
-
-            null height 20
-
-            textbutton "Close" action Hide("examine_item") xalign 0.5
-
-# ============================================================================
-# HOTSPOT INTERACTION SCREEN
-# ============================================================================
-
-screen hotspot_message(title, message):
+# Map screen showing discovered locations
+screen map_screen():
     tag menu
-    modal True
-
-    add Solid("#00000099")
 
     frame:
-        xalign 0.5
-        yalign 0.5
-        padding (40, 40)
-        background Solid("#2a2a4e")
-        xsize 500
+        xfill True
+        yfill True
+        padding (50, 50)
 
         vbox:
             spacing 20
 
-            text title:
-                xalign 0.5
-                size 28
-                color "#ffcc66"
-
-            null height 10
-
-            text message:
-                xalign 0.5
-                size 20
-                color "#cccccc"
-                text_align 0.5
+            text "World Map" size 32 bold True xalign 0.5
 
             null height 20
 
-            textbutton "OK" action Hide("hotspot_message") xalign 0.5
+            text "Discovered Locations:" size 24
 
-# ============================================================================
-# HELPER FUNCTIONS
-# ============================================================================
+            $ discovered = exploration_manager.get_discovered_locations()
 
-init python:
-    def get_exit_position(direction):
-        """Get screen position for exit buttons based on direction."""
-        positions = {
-            "north": (0.5 * config.screen_width - 50, 50),
-            "south": (0.5 * config.screen_width - 50, config.screen_height - 100),
-            "east": (config.screen_width - 120, 0.5 * config.screen_height),
-            "west": (20, 0.5 * config.screen_height),
-            "up": (config.screen_width - 120, 100),
-            "down": (config.screen_width - 120, config.screen_height - 150),
-        }
-        return positions.get(direction.lower(), (0.5 * config.screen_width, 0.5 * config.screen_height))
+            for loc in discovered:
+                hbox:
+                    spacing 20
+                    $ is_current = (loc.id == exploration_manager.current_location)
+                    $ can_travel = loc.accessible and not is_current
 
-    def handle_hotspot_click(hotspot_id):
-        """Handle clicking on a hotspot."""
-        result = exploration_manager.interact_with_hotspot(hotspot_id)
+                    text loc.name size 20:
+                        if is_current:
+                            color "#FFD700"
+                        elif not loc.accessible:
+                            color "#888888"
 
-        if result is None:
-            return
+                    if can_travel:
+                        textbutton "Travel" action Return(("travel", loc.id))
+                    elif is_current:
+                        text "(Current)" size 16 yalign 0.5
 
-        status, data = result
+            null height 30
 
-        if status == "need_item":
-            item_name = item_data.get(data, {}).get("name", data)
-            renpy.show_screen("hotspot_message",
-                            title="Cannot Interact",
-                            message="You need the {} to interact with this.".format(item_name))
-        elif status == "success":
-            if isinstance(data, str):
-                # It's a label to jump to
-                renpy.call_in_new_context(data)
-            elif callable(data):
-                # It's a function to call
-                data()
+            textbutton "Close Map" action Return(("close", None)) xalign 0.5
 
-    def toggle_item_selection(item_id):
-        """Toggle selection of an inventory item."""
-        if exploration_manager.selected_item == item_id:
-            exploration_manager.deselect_item()
-        else:
-            exploration_manager.select_item(item_id)
-
-    def show_item_pickup_message(item_id):
-        """Show a message when picking up an item."""
-        item_name = item_data.get(item_id, {}).get("name", item_id)
-        renpy.show_screen("hotspot_message",
-                         title="Item Found!",
-                         message="You picked up: {}".format(item_name))
-
-# ============================================================================
-# EXAMPLE LOCATIONS SETUP
-# ============================================================================
-
-init python:
-    def setup_example_locations():
-        """Set up example exploration locations."""
-        global exploration_manager
-
-        # Create the Room location
-        room = Location(
-            id="room",
-            name="The Study",
-            background="bg_explore_room",
-            exits={"hallway": "hallway"}
-        )
-
-        # Add hotspots to the room
-        room.add_hotspot(Hotspot(
-            id="room_desk",
-            position=(100, 200),
-            size=(200, 150),
-            action="examine_desk",
-            hover_text="An old wooden desk"
-        ))
-
-        room.add_hotspot(Hotspot(
-            id="room_bookshelf",
-            position=(400, 100),
-            size=(180, 300),
-            action="examine_bookshelf",
-            hover_text="A dusty bookshelf"
-        ))
-
-        room.add_hotspot(Hotspot(
-            id="room_safe",
-            position=(650, 250),
-            size=(100, 100),
-            action="examine_safe",
-            hover_text="A locked safe",
-            required_item="old_key",
-            visible_condition=lambda: exploration_manager.has_examined("room_bookshelf")
-        ))
-
-        # Add an item that can be picked up
-        room.add_item("flashlight")
-        room.add_hotspot(Hotspot(
-            id="room_flashlight",
-            position=(300, 350),
-            size=(80, 40),
-            action=lambda: pickup_and_notify("flashlight"),
-            hover_text="A flashlight on the floor",
-            one_time=True
-        ))
-
-        # Create the Hallway location
-        hallway = Location(
-            id="hallway",
-            name="Main Hallway",
-            background="bg_explore_hallway",
-            exits={"study": "room", "garden": "garden"}
-        )
-
-        hallway.add_hotspot(Hotspot(
-            id="hallway_painting",
-            position=(200, 100),
-            size=(150, 200),
-            action="examine_painting",
-            hover_text="A mysterious painting"
-        ))
-
-        hallway.add_hotspot(Hotspot(
-            id="hallway_cabinet",
-            position=(500, 200),
-            size=(120, 180),
-            action="examine_cabinet",
-            hover_text="An antique cabinet"
-        ))
-
-        hallway.add_item("old_key")
-        hallway.add_hotspot(Hotspot(
-            id="hallway_key",
-            position=(350, 380),
-            size=(60, 30),
-            action=lambda: pickup_and_notify("old_key"),
-            hover_text="Something shiny on the floor",
-            one_time=True
-        ))
-
-        # Create the Garden location
-        garden = Location(
-            id="garden",
-            name="Garden",
-            background="bg_explore_garden",
-            exits={"inside": "hallway"}
-        )
-
-        garden.add_hotspot(Hotspot(
-            id="garden_fountain",
-            position=(300, 150),
-            size=(200, 200),
-            action="examine_fountain",
-            hover_text="An old stone fountain"
-        ))
-
-        garden.add_hotspot(Hotspot(
-            id="garden_flowers",
-            position=(100, 300),
-            size=(150, 100),
-            action=lambda: pickup_and_notify("garden_flower"),
-            hover_text="Beautiful flowers",
-            one_time=True
-        ))
-
-        garden.add_item("garden_flower")
-
-        garden.add_hotspot(Hotspot(
-            id="garden_statue",
-            position=(550, 200),
-            size=(120, 250),
-            action="examine_statue",
-            hover_text="A weathered statue",
-            visible_condition=lambda: exploration_manager.has_item("flashlight")
-        ))
-
-        # Register all locations
-        exploration_manager.register_location(room)
-        exploration_manager.register_location(hallway)
-        exploration_manager.register_location(garden)
-
-    def pickup_and_notify(item_id):
-        """Helper to pick up an item and show notification."""
-        if exploration_manager.pick_up_item(item_id):
-            show_item_pickup_message(item_id)
-
-# ============================================================================
-# EXPLORATION INTERACTION LABELS
-# ============================================================================
-
-label examine_desk:
-    $ exploration_manager.examine("room_desk")
-    "You examine the old wooden desk."
-    "There are papers scattered across its surface, but nothing immediately useful."
-    "Wait... there's a note tucked under a paperweight."
-    $ exploration_manager.pick_up_item("mysterious_note") if "mysterious_note" not in exploration_manager.inventory else None
-    if "mysterious_note" in exploration_manager.inventory:
-        "You found a Mysterious Note!"
-    return
-
-label examine_bookshelf:
-    $ exploration_manager.examine("room_bookshelf")
-    "The bookshelf is filled with ancient tomes and dusty volumes."
-    "As you examine the books, you notice one section seems different..."
-    "There's a gap behind some of the books. Something is hidden here!"
-    "You notice what appears to be a safe hidden behind a false panel."
-    return
-
-label examine_safe:
-    if exploration_manager.has_item("old_key"):
-        "You use the old key to open the safe..."
-        $ exploration_manager.remove_item("old_key")
-        "Click! The safe opens!"
-        "Inside, you find an ancient leather-bound book."
-        $ exploration_manager.inventory.append("ancient_book") if "ancient_book" not in exploration_manager.inventory else None
-        "You obtained the Ancient Book!"
-    else:
-        "The safe is locked. You need a key to open it."
-    return
-
-label examine_painting:
-    $ exploration_manager.examine("hallway_painting")
-    "A portrait of someone from long ago stares back at you."
-    "The eyes seem to follow you as you move..."
-    "There's something unsettling about this painting."
-    return
-
-label examine_cabinet:
-    $ exploration_manager.examine("hallway_cabinet")
-    "An ornate cabinet filled with curiosities."
-    "Most of the drawers are stuck shut with age."
-    "One drawer contains only old photographs and yellowed letters."
-    return
-
+# Hotspot interaction labels
 label examine_fountain:
-    $ exploration_manager.examine("garden_fountain")
-    "The fountain hasn't run in years."
-    "Moss covers the stone, and the basin is filled with fallen leaves."
-    "Something glints at the bottom of the empty basin..."
+    "The fountain features an elegant statue of a mermaid."
+    "Crystal clear water flows from her outstretched hands."
+    "You notice some coins at the bottom. Make a wish?"
+    menu:
+        "Toss a coin and make a wish":
+            "You toss a coin into the fountain."
+            "You feel... lucky?"
+        "Just admire it":
+            "You simply enjoy the peaceful sound of flowing water."
     return
 
-label examine_statue:
-    $ exploration_manager.examine("garden_statue")
-    if exploration_manager.has_item("flashlight"):
-        "You shine your flashlight on the weathered statue."
-        "The light reveals an inscription you couldn't see before:"
-        "\"The truth lies where shadows cannot reach.\""
-    else:
-        "The statue is too dark to examine properly."
-        "You might need a light source."
+label read_notices:
+    "The notice board is covered with various postings."
+    menu:
+        "Read 'Help Wanted' poster":
+            "The local guild is seeking adventurers for a quest."
+            "Reward: 500 Gold"
+        "Read 'Missing Pet' notice":
+            "Someone's cat named 'Whiskers' has gone missing."
+            "Last seen near the market."
+        "Read 'Town Event' announcement":
+            "The annual harvest festival is next week!"
+        "Step away":
+            pass
     return
 
-# ============================================================================
-# EXPLORATION ENTRY POINT
-# ============================================================================
-
-label start_exploration:
-    # Initialize locations if not already done
-    $ setup_example_locations()
-
-    # Start in the room
-    $ exploration_manager.move_to_location("room")
-
-    "You find yourself in a mysterious old house..."
-    "Click around to explore and find clues."
-
-    # Show the exploration screen
-    call screen exploration
-
-    "You finished exploring for now."
+label talk_bartender:
+    "Bartender" "Welcome, traveler! What can I get for ya?"
+    menu:
+        "Ask for a drink":
+            "Bartender" "Coming right up!"
+            "You enjoy a refreshing beverage."
+        "Ask for information":
+            "Bartender" "Looking for rumors, eh? Well..."
+            "Bartender" "I heard there's treasure hidden in the old ruins north of town."
+        "Just browsing":
+            "Bartender" "Take your time, friend."
     return
 
-# ============================================================================
-# INTEGRATION EXAMPLE
-# ============================================================================
-# To use this exploration system in your game, add this to your script:
-#
-#   label some_point_in_story:
-#       "The character enters an explorable area..."
-#       call start_exploration
-#       "After exploring..."
-#       # Continue your story
-#
-# Or create your own locations:
-#
-#   init python:
-#       my_location = Location(
-#           id="my_loc",
-#           name="My Custom Location",
-#           background="bg_my_location",
-#           exits={"exit": "other_location"}
-#       )
-#       my_location.add_hotspot(Hotspot(
-#           id="my_hotspot",
-#           position=(100, 100),
-#           size=(50, 50),
-#           action="my_interaction_label",
-#           hover_text="Click me!"
-#       ))
-#       exploration_manager.register_location(my_location)
+label approach_stranger:
+    "You approach the hooded figure cautiously."
+    "???" "..."
+    "???" "You seek something. I can see it in your eyes."
+    menu:
+        "Ask about the stranger":
+            "???" "Who I am matters not. What matters is your journey."
+        "Ask about the town":
+            "???" "This town holds many secrets. Look beneath the surface."
+        "Leave them alone":
+            "You decide not to disturb them further."
+    return
+
+label use_fireplace:
+    "You warm yourself by the crackling fire."
+    "The warmth is comforting after your travels."
+    "You feel refreshed."
+    return
+
+label enter_weapon_shop:
+    "You enter the weapon shop."
+    "Rows of swords, axes, and armor line the walls."
+    # Could integrate with shop system here
+    return
+
+label browse_potions:
+    "The potion seller greets you with a toothy grin."
+    "Potion Seller" "Potions! Get your potions here!"
+    # Could integrate with shop system here
+    return
+
+# Main exploration loop
+label exploration_demo:
+    python:
+        setup_exploration()
+
+    "Welcome to the exploration demo!"
+    "Click on highlighted areas to interact with them."
+    "Use the map to travel between discovered locations."
+
+label exploration_loop:
+    call screen exploration_screen
+    $ result = _return
+
+    if result[0] == "hotspot":
+        $ hotspot_id = result[1]
+        $ current_loc = exploration_manager.get_current_location()
+        $ hotspot = current_loc.get_hotspot(hotspot_id)
+
+        if hotspot and hotspot.destination:
+            # Travel to destination
+            $ success = exploration_manager.travel_to(hotspot.destination)
+            if success:
+                $ new_loc = exploration_manager.get_current_location()
+                "You travel to [new_loc.name]."
+            else:
+                "You can't go there right now."
+        elif hotspot and hotspot.interaction_label:
+            call expression hotspot.interaction_label from _call_hotspot_interaction
+
+    elif result[0] == "map":
+        call screen map_screen
+        $ map_result = _return
+        if map_result[0] == "travel":
+            $ success = exploration_manager.travel_to(map_result[1])
+            if success:
+                $ new_loc = exploration_manager.get_current_location()
+                "You travel to [new_loc.name]."
+
+    elif result[0] == "inventory":
+        # Could show inventory screen here
+        "Inventory functionality would go here."
+
+    elif result[0] == "back":
+        if exploration_manager.previous_location:
+            $ exploration_manager.travel_to(exploration_manager.previous_location)
+        else:
+            "You have nowhere to go back to."
+
+    jump exploration_loop
