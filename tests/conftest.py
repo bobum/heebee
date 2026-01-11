@@ -106,11 +106,28 @@ def load_rpy_classes(rpy_path: Path, namespace: dict = None) -> dict:
     return namespace
 
 
+class MockMusic:
+    """Mock renpy.music module for testing."""
+
+    def play(self, *args, **kwargs):
+        pass
+
+    def stop(self, *args, **kwargs):
+        pass
+
+    def set_volume(self, *args, **kwargs):
+        pass
+
+    def get_playing(self, *args, **kwargs):
+        return None
+
+
 class MockRenpy:
     """Mock renpy module for testing outside of Ren'Py."""
 
     def __init__(self):
         self.random = __import__('random')
+        self.music = MockMusic()
 
     def show_screen(self, *args, **kwargs):
         pass
