@@ -524,55 +524,58 @@ screen memory_gallery():
             # Sort by unlock date (unlocked first, then by date)
             $ sorted_memories = sorted(display_memories, key=lambda m: (not m.unlocked, m.unlock_date or ""))
 
-            # Display in grid
-            grid 3 (len(sorted_memories) // 3 + (1 if len(sorted_memories) % 3 else 0)):
-                spacing 20
-                xalign 0.5
+            # Display memories in a simple vertical list
+            vbox:
+                spacing 15
+                xfill True
 
                 for memory in sorted_memories:
-                    frame:
-                        xysize (250, 200)
-                        padding (15, 15)
-
-                        if memory.unlocked:
+                    if memory.unlocked:
+                        button:
+                            xfill True
+                            padding (15, 15)
                             background "#3a3a5e"
+                            hover_background "#4a4a7e"
                             action Function(flashback_manager.play_flashback, memory.id)
 
-                            vbox:
-                                spacing 8
+                            hbox:
+                                spacing 15
 
                                 # Thumbnail area
                                 frame:
-                                    xysize (220, 100)
+                                    xysize (120, 80)
                                     background "#4a4a6e"
                                     if memory.thumbnail:
                                         add memory.thumbnail fit "contain" align (0.5, 0.5)
                                     else:
-                                        text memory.name[0:3].upper() align (0.5, 0.5) size 30 color "#888888"
+                                        text memory.name[0:3].upper() align (0.5, 0.5) size 24 color "#888888"
 
                                 # Memory info
-                                text memory.name size 16 color "#ffffff"
-                                text memory.description size 12 color "#aaaaaa"
+                                vbox:
+                                    spacing 5
+                                    text memory.name size 18 color "#ffffff"
+                                    text memory.description size 14 color "#aaaaaa"
 
-                        else:
+                    else:
+                        frame:
+                            xfill True
+                            padding (15, 15)
                             background "#2a2a3e"
 
-                            vbox:
-                                spacing 8
+                            hbox:
+                                spacing 15
 
                                 # Locked thumbnail
                                 frame:
-                                    xysize (220, 100)
+                                    xysize (120, 80)
                                     background "#333344"
-                                    text "?" align (0.5, 0.5) size 40 color "#555555"
+                                    text "?" align (0.5, 0.5) size 30 color "#555555"
 
                                 # Locked indicator
-                                text "???" size 16 color "#666666"
-                                text "Locked" size 12 color "#555555"
-
-                # Pad grid if needed
-                for i in range((3 - len(sorted_memories) % 3) % 3):
-                    null
+                                vbox:
+                                    spacing 5
+                                    text "???" size 18 color "#666666"
+                                    text "Locked" size 14 color "#555555"
 
     # Back button
     textbutton "Back" action Return():

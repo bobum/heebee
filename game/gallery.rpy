@@ -567,69 +567,90 @@ init python:
 screen cg_gallery_screen():
     tag menu
 
-    use game_menu(_("CG Gallery"), scroll="viewport"):
-
-        style_prefix "gallery"
+    frame:
+        xfill True
+        yfill True
+        background "#1a1a1a"
+        padding (40, 40)
 
         vbox:
             spacing 20
+            xfill True
+            yfill True
 
-            # Completion bar
+            # Title bar with close button
             hbox:
                 xfill True
-                text "Gallery Completion: " size 20 color "#ffffff"
-                $ completion = gallery_manager.get_gallery_completion()
-                text "{:.1f}%".format(completion) size 20 color "#66ff66"
+                text _("CG Gallery") size 36 color "#ffffff"
+                textbutton _("Return") action Return() align (1.0, 0.5)
 
-            null height 10
+            style_prefix "gallery"
 
-            # Category filter buttons
-            hbox:
-                spacing 10
-                textbutton "All" action SetVariable("gallery_current_category", "all"):
-                    style "gallery_category_button"
-                    if gallery_current_category == "all":
-                        background "#4444aa"
+            viewport:
+                scrollbars "vertical"
+                mousewheel True
+                xfill True
+                yfill True
 
-                for cat_id, cat_name in GALLERY_CATEGORIES.items():
-                    $ cat_items = gallery_manager.get_gallery_items_by_category(cat_id)
-                    if cat_items:
-                        textbutton cat_name action SetVariable("gallery_current_category", cat_id):
+                vbox:
+                    spacing 20
+
+                    # Completion bar
+                    hbox:
+                        xfill True
+                        text "Gallery Completion: " size 20 color "#ffffff"
+                        $ completion = gallery_manager.get_gallery_completion()
+                        text "{:.1f}%".format(completion) size 20 color "#66ff66"
+
+                    null height 10
+
+                    # Category filter buttons
+                    hbox:
+                        spacing 10
+                        textbutton "All" action SetVariable("gallery_current_category", "all"):
                             style "gallery_category_button"
-                            if gallery_current_category == cat_id:
+                            if gallery_current_category == "all":
                                 background "#4444aa"
 
-            null height 20
+                        for cat_id, cat_name in GALLERY_CATEGORIES.items():
+                            $ cat_items = gallery_manager.get_gallery_items_by_category(cat_id)
+                            if cat_items:
+                                textbutton cat_name action SetVariable("gallery_current_category", cat_id):
+                                    style "gallery_category_button"
+                                    if gallery_current_category == cat_id:
+                                        background "#4444aa"
 
-            # CG grid
-            grid 4 None:
-                spacing 15
-                xfill True
+                    null height 20
 
-                if gallery_current_category == "all":
-                    $ display_items = gallery_manager.get_all_gallery_items()
-                else:
-                    $ display_items = gallery_manager.get_gallery_items_by_category(gallery_current_category)
+                    # CG grid
+                    grid 4 None:
+                        spacing 15
+                        xfill True
 
-                for item in display_items:
-                    button:
-                        xysize (180, 135)
-                        if item.unlocked:
-                            background "#333333"
-                            action [SetVariable("gallery_current_image", item), ShowMenu("image_viewer_screen")]
-                            hovered tt.Action(item.name)
-
-                            # Thumbnail
-                            add item.thumbnail fit "contain" align (0.5, 0.5)
+                        if gallery_current_category == "all":
+                            $ display_items = gallery_manager.get_all_gallery_items()
                         else:
-                            background "#222222"
-                            action NullAction()
+                            $ display_items = gallery_manager.get_gallery_items_by_category(gallery_current_category)
 
-                            # Locked placeholder
-                            frame:
+                        for item in display_items:
+                            button:
                                 xysize (180, 135)
-                                background "#1a1a1a"
-                                text "?" align (0.5, 0.5) size 40 color "#444444"
+                                if item.unlocked:
+                                    background "#333333"
+                                    action [SetVariable("gallery_current_image", item), ShowMenu("image_viewer_screen")]
+                                    hovered tt.Action(item.name)
+
+                                    # Thumbnail
+                                    add item.thumbnail fit "contain" align (0.5, 0.5)
+                                else:
+                                    background "#222222"
+                                    action NullAction()
+
+                                    # Locked placeholder
+                                    frame:
+                                        xysize (180, 135)
+                                        background "#1a1a1a"
+                                        text "?" align (0.5, 0.5) size 40 color "#444444"
 
 # =============================================================================
 # IMAGE VIEWER SCREEN - Fullscreen image display
@@ -693,88 +714,109 @@ init python:
 screen music_player_screen():
     tag menu
 
-    use game_menu(_("Music Player"), scroll="viewport"):
-
-        style_prefix "music"
+    frame:
+        xfill True
+        yfill True
+        background "#1a1a1a"
+        padding (40, 40)
 
         vbox:
             spacing 20
+            xfill True
+            yfill True
 
-            # Completion bar
+            # Title bar with close button
             hbox:
                 xfill True
-                text "Music Unlocked: " size 20 color "#ffffff"
-                $ completion = gallery_manager.get_music_completion()
-                text "{:.1f}%".format(completion) size 20 color "#66ff66"
+                text _("Music Player") size 36 color "#ffffff"
+                textbutton _("Return") action Return() align (1.0, 0.5)
 
-            null height 10
+            style_prefix "music"
 
-            # Now playing display
-            frame:
+            viewport:
+                scrollbars "vertical"
+                mousewheel True
                 xfill True
-                padding (20, 15)
-                background "#333355"
+                yfill True
 
                 vbox:
-                    spacing 10
+                    spacing 20
 
-                    text "Now Playing:" size 18 color "#aaaaaa"
-
-                    if music_player_current_track:
-                        text music_player_current_track.name size 28 color "#ffffff"
-                    else:
-                        text "No track selected" size 28 color "#666666"
-
-                    # Playback controls
+                    # Completion bar
                     hbox:
-                        xalign 0.5
-                        spacing 30
+                        xfill True
+                        text "Music Unlocked: " size 20 color "#ffffff"
+                        $ completion = gallery_manager.get_music_completion()
+                        text "{:.1f}%".format(completion) size 20 color "#66ff66"
 
-                        textbutton "Stop" action Function(music_player_stop):
-                            style "music_control_button"
+                    null height 10
 
-                        if music_player_playing:
-                            textbutton "Pause" action Function(music_player_pause):
-                                style "music_control_button"
-                        else:
-                            textbutton "Play" action Function(music_player_play):
-                                style "music_control_button"
+                    # Now playing display
+                    frame:
+                        xfill True
+                        padding (20, 15)
+                        background "#333355"
 
-            null height 20
+                        vbox:
+                            spacing 10
 
-            # Track list
-            text "Available Tracks" size 24 color "#ffffff"
+                            text "Now Playing:" size 18 color "#aaaaaa"
 
-            null height 10
+                            if music_player_current_track:
+                                text music_player_current_track.name size 28 color "#ffffff"
+                            else:
+                                text "No track selected" size 28 color "#666666"
 
-            for track in gallery_manager.get_all_music_tracks():
-                frame:
-                    xfill True
-                    padding (15, 10)
+                            # Playback controls
+                            hbox:
+                                xalign 0.5
+                                spacing 30
 
-                    if track.unlocked:
-                        background "#333333"
-                        hbox:
-                            spacing 20
+                                textbutton "Stop" action Function(music_player_stop):
+                                    style "music_control_button"
 
-                            # Play button
-                            textbutton ">" action Function(music_player_select, track):
-                                style "music_play_button"
-                                if music_player_current_track == track and music_player_playing:
-                                    text_color "#66ff66"
+                                if music_player_playing:
+                                    textbutton "Pause" action Function(music_player_pause):
+                                        style "music_control_button"
+                                else:
+                                    textbutton "Play" action Function(music_player_play):
+                                        style "music_control_button"
 
-                            # Track name
-                            text track.name size 20 color "#ffffff" yalign 0.5
+                    null height 20
 
-                            # Currently playing indicator
-                            if music_player_current_track == track and music_player_playing:
-                                text "(Playing)" size 16 color "#66ff66" yalign 0.5
-                    else:
-                        background "#222222"
-                        hbox:
-                            spacing 20
-                            text "?" size 20 color "#444444"
-                            text "Locked" size 20 color "#444444" yalign 0.5
+                    # Track list
+                    text "Available Tracks" size 24 color "#ffffff"
+
+                    null height 10
+
+                    for track in gallery_manager.get_all_music_tracks():
+                        frame:
+                            xfill True
+                            padding (15, 10)
+
+                            if track.unlocked:
+                                background "#333333"
+                                hbox:
+                                    spacing 20
+
+                                    # Play button
+                                    textbutton ">" action Function(music_player_select, track):
+                                        style "music_play_button"
+                                        if music_player_current_track == track and music_player_playing:
+                                            text_color "#66ff66"
+
+                                    # Track name
+                                    text track.name size 20 color "#ffffff" yalign 0.5
+
+                                    # Currently playing indicator
+                                    if music_player_current_track == track and music_player_playing:
+                                        text "(Playing)" size 16 color "#66ff66" yalign 0.5
+                            else:
+                                background "#222222"
+                                hbox:
+                                    spacing 20
+                                    text "?" size 20 color "#444444"
+                                    text "Locked" size 20 color "#444444" yalign 0.5
 
 init python:
     def music_player_select(track):
@@ -815,45 +857,66 @@ init python:
 screen scene_replay_screen():
     tag menu
 
-    use game_menu(_("Scene Replay"), scroll="viewport"):
-
-        style_prefix "scene"
+    frame:
+        xfill True
+        yfill True
+        background "#1a1a1a"
+        padding (40, 40)
 
         vbox:
             spacing 20
+            xfill True
+            yfill True
 
-            # Completion bar
+            # Title bar with close button
             hbox:
                 xfill True
-                text "Scenes Unlocked: " size 20 color "#ffffff"
-                $ completion = gallery_manager.get_scene_completion()
-                text "{:.1f}%".format(completion) size 20 color "#66ff66"
+                text _("Scene Replay") size 36 color "#ffffff"
+                textbutton _("Return") action Return() align (1.0, 0.5)
 
-            null height 20
+            style_prefix "scene"
 
-            # Scene list
-            for scene in gallery_manager.get_all_scene_replays():
-                frame:
-                    xfill True
-                    padding (20, 15)
+            viewport:
+                scrollbars "vertical"
+                mousewheel True
+                xfill True
+                yfill True
 
-                    if scene.unlocked:
-                        background "#333333"
-                        hbox:
-                            spacing 20
+                vbox:
+                    spacing 20
 
-                            # Scene name
-                            text scene.name size 22 color "#ffffff" xfill True yalign 0.5
+                    # Completion bar
+                    hbox:
+                        xfill True
+                        text "Scenes Unlocked: " size 20 color "#ffffff"
+                        $ completion = gallery_manager.get_scene_completion()
+                        text "{:.1f}%".format(completion) size 20 color "#66ff66"
 
-                            # Replay button
-                            textbutton "Replay" action Function(scene_replay_start, scene):
-                                style "scene_replay_button"
-                    else:
-                        background "#222222"
-                        hbox:
-                            spacing 20
-                            text "???" size 22 color "#444444" xfill True yalign 0.5
-                            text "Locked" size 18 color "#444444" yalign 0.5
+                    null height 20
+
+                    # Scene list
+                    for scene in gallery_manager.get_all_scene_replays():
+                        frame:
+                            xfill True
+                            padding (20, 15)
+
+                            if scene.unlocked:
+                                background "#333333"
+                                hbox:
+                                    spacing 20
+
+                                    # Scene name
+                                    text scene.name size 22 color "#ffffff" xfill True yalign 0.5
+
+                                    # Replay button
+                                    textbutton "Replay" action Function(scene_replay_start, scene):
+                                        style "scene_replay_button"
+                            else:
+                                background "#222222"
+                                hbox:
+                                    spacing 20
+                                    text "???" size 22 color "#444444" xfill True yalign 0.5
+                                    text "Locked" size 18 color "#444444" yalign 0.5
 
 init python:
     def scene_replay_start(scene):
@@ -867,97 +930,118 @@ init python:
 screen gallery_hub_screen():
     tag menu
 
-    use game_menu(_("Gallery"), scroll="viewport"):
-
-        style_prefix "gallery_hub"
+    frame:
+        xfill True
+        yfill True
+        background "#1a1a1a"
+        padding (40, 40)
 
         vbox:
-            spacing 30
+            spacing 20
+            xfill True
+            yfill True
 
-            # Total completion
-            frame:
+            # Title bar with close button
+            hbox:
                 xfill True
-                padding (20, 15)
-                background "#333355"
+                text _("Gallery") size 36 color "#ffffff"
+                textbutton _("Return") action Return() align (1.0, 0.5)
 
-                hbox:
-                    xfill True
-                    text "Total Completion: " size 24 color "#ffffff"
-                    $ total_completion = gallery_manager.get_total_completion()
-                    text "{:.1f}%".format(total_completion) size 24 color "#66ff66"
+            style_prefix "gallery_hub"
 
-            null height 20
+            viewport:
+                scrollbars "vertical"
+                mousewheel True
+                xfill True
+                yfill True
 
-            # Gallery sections
-            vbox:
-                spacing 20
+                vbox:
+                    spacing 30
 
-                # CG Gallery
-                button:
-                    xfill True
-                    padding (20, 20)
-                    background "#333333"
-                    hover_background "#444444"
-                    action ShowMenu("cg_gallery_screen")
+                    # Total completion
+                    frame:
+                        xfill True
+                        padding (20, 15)
+                        background "#333355"
 
-                    hbox:
+                        hbox:
+                            xfill True
+                            text "Total Completion: " size 24 color "#ffffff"
+                            $ total_completion = gallery_manager.get_total_completion()
+                            text "{:.1f}%".format(total_completion) size 24 color "#66ff66"
+
+                    null height 20
+
+                    # Gallery sections
+                    vbox:
                         spacing 20
 
-                        # Icon placeholder
-                        frame:
-                            xysize (60, 60)
-                            background "#555555"
-                            text "CG" align (0.5, 0.5) size 20 color "#ffffff"
+                        # CG Gallery
+                        button:
+                            xfill True
+                            padding (20, 20)
+                            background "#333333"
+                            hover_background "#444444"
+                            action ShowMenu("cg_gallery_screen")
 
-                        vbox:
-                            text "CG Gallery" size 24 color "#ffffff"
-                            $ cg_count = len(gallery_manager.get_unlocked_gallery_items())
-                            $ cg_total = len(gallery_manager.get_all_gallery_items())
-                            text "[cg_count]/[cg_total] unlocked" size 16 color "#aaaaaa"
+                            hbox:
+                                spacing 20
 
-                # Music Player
-                button:
-                    xfill True
-                    padding (20, 20)
-                    background "#333333"
-                    hover_background "#444444"
-                    action ShowMenu("music_player_screen")
+                                # Icon placeholder
+                                frame:
+                                    xysize (60, 60)
+                                    background "#555555"
+                                    text "CG" align (0.5, 0.5) size 20 color "#ffffff"
 
-                    hbox:
-                        spacing 20
+                                vbox:
+                                    text "CG Gallery" size 24 color "#ffffff"
+                                    $ cg_count = len(gallery_manager.get_unlocked_gallery_items())
+                                    $ cg_total = len(gallery_manager.get_all_gallery_items())
+                                    text "[cg_count]/[cg_total] unlocked" size 16 color "#aaaaaa"
 
-                        frame:
-                            xysize (60, 60)
-                            background "#555555"
-                            text "BGM" align (0.5, 0.5) size 18 color "#ffffff"
+                        # Music Player
+                        button:
+                            xfill True
+                            padding (20, 20)
+                            background "#333333"
+                            hover_background "#444444"
+                            action ShowMenu("music_player_screen")
 
-                        vbox:
-                            text "Music Player" size 24 color "#ffffff"
-                            $ music_count = len(gallery_manager.get_unlocked_music_tracks())
-                            $ music_total = len(gallery_manager.get_all_music_tracks())
-                            text "[music_count]/[music_total] unlocked" size 16 color "#aaaaaa"
+                            hbox:
+                                spacing 20
 
-                # Scene Replay
-                button:
-                    xfill True
-                    padding (20, 20)
-                    background "#333333"
-                    hover_background "#444444"
-                    action ShowMenu("scene_replay_screen")
+                                frame:
+                                    xysize (60, 60)
+                                    background "#555555"
+                                    text "BGM" align (0.5, 0.5) size 18 color "#ffffff"
 
-                    hbox:
-                        spacing 20
+                                vbox:
+                                    text "Music Player" size 24 color "#ffffff"
+                                    $ music_count = len(gallery_manager.get_unlocked_music_tracks())
+                                    $ music_total = len(gallery_manager.get_all_music_tracks())
+                                    text "[music_count]/[music_total] unlocked" size 16 color "#aaaaaa"
 
-                        frame:
-                            xysize (60, 60)
-                            background "#555555"
-                            text "SCN" align (0.5, 0.5) size 18 color "#ffffff"
+                        # Scene Replay
+                        button:
+                            xfill True
+                            padding (20, 20)
+                            background "#333333"
+                            hover_background "#444444"
+                            action ShowMenu("scene_replay_screen")
 
-                        vbox:
-                            text "Scene Replay" size 24 color "#ffffff"
-                            $ scene_count = len(gallery_manager.get_unlocked_scene_replays())
-                            $ scene_total = len(gallery_manager.get_all_scene_replays())
-                            text "[scene_count]/[scene_total] unlocked" size 16 color "#aaaaaa"
+                            hbox:
+                                spacing 20
+
+                                frame:
+                                    xysize (60, 60)
+                                    background "#555555"
+                                    text "SCN" align (0.5, 0.5) size 18 color "#ffffff"
+
+                                vbox:
+                                    text "Scene Replay" size 24 color "#ffffff"
+                                    $ scene_count = len(gallery_manager.get_unlocked_scene_replays())
+                                    $ scene_total = len(gallery_manager.get_all_scene_replays())
+                                    text "[scene_count]/[scene_total] unlocked" size 16 color "#aaaaaa"
 
 # =============================================================================
 # GALLERY STYLES

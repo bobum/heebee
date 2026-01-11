@@ -7,7 +7,7 @@
 # ============================================================================
 
 init python:
-    from datetime import datetime
+    import datetime as dt
     from typing import Optional, List, Dict, Any
 
     class JournalCategory:
@@ -70,7 +70,7 @@ init python:
             if self.unlocked:
                 return False
             self.unlocked = True
-            self.unlock_date = datetime.now().isoformat()
+            self.unlock_date = dt.datetime.now().isoformat()
             return True
 
         def mark_read(self) -> bool:

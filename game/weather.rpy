@@ -1063,9 +1063,11 @@ screen weather_debug():
             null height 5
 
             $ mods = weather_manager.get_modifiers()
+            $ mood_color = "#88ff88" if mods.get('mood', 0) >= 0 else "#ff8888"
+            $ energy_color = "#88ff88" if mods.get('energy', 0) >= 0 else "#ff8888"
             text "Modifiers:" size 14 color "#aaaaaa"
-            text "  Mood: [mods.get('mood', 0)]" size 12 color "#88ff88" if mods.get('mood', 0) >= 0 else "#ff8888"
-            text "  Energy: [mods.get('energy', 0)]" size 12 color "#88ff88" if mods.get('energy', 0) >= 0 else "#ff8888"
+            text "  Mood: [mods.get('mood', 0)]" size 12 color mood_color
+            text "  Energy: [mods.get('energy', 0)]" size 12 color energy_color
             text "  Visibility: [mods.get('visibility', 100)]%" size 12 color "#ffffff"
 
             if weather_manager.is_transitioning:

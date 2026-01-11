@@ -553,7 +553,7 @@ init python:
 # ============================================================================
 
 screen mod_manager():
-    """Main mod manager screen."""
+    # Main mod manager screen.
     tag menu
     modal True
 
@@ -620,11 +620,12 @@ screen mod_manager():
 
 
 screen mod_list_item(mod):
-    """Individual mod item in the list."""
+    # Individual mod item in the list.
+    $ mod_bg = Solid("#3a3a5e") if mod.enabled else Solid("#2d2d4a")
     button:
         xfill True
         padding (15, 10, 15, 10)
-        background Solid("#3a3a5e") if mod.enabled else Solid("#2d2d4a")
+        background mod_bg
         hover_background Solid("#4a4a6e")
         action Show("mod_details", mod=mod)
 
@@ -633,10 +634,12 @@ screen mod_list_item(mod):
             xfill True
 
             # Enable/disable toggle
-            textbutton ("[X]" if mod.enabled else "[ ]"):
+            $ toggle_text = "[X]" if mod.enabled else "[ ]"
+            $ toggle_color = "#66ff66" if mod.enabled else "#aaaaaa"
+            textbutton toggle_text:
                 action ToggleModEnabled(mod.id)
                 text_size 18
-                text_color "#66ff66" if mod.enabled else "#aaaaaa"
+                text_color toggle_color
 
             # Mod info
             vbox:
@@ -654,7 +657,7 @@ screen mod_list_item(mod):
 
 
 screen mod_details(mod):
-    """Detailed view of a single mod."""
+    # Detailed view of a single mod.
     tag menu
     modal True
 

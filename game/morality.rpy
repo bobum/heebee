@@ -551,178 +551,199 @@ screen karma_notification(amount, reason=""):
 screen karma_screen():
     tag menu
 
-    use game_menu(_("Karma"), scroll="viewport"):
-
-        style_prefix "karma"
-
-        $ align_id, align_label, align_color = morality_manager.get_alignment()
-        $ karma_value = morality_manager.karma
-        $ summary = morality_manager.get_status_summary()
+    frame:
+        xfill True
+        yfill True
+        background "#1a1a1a"
+        padding (40, 40)
 
         vbox:
             spacing 20
+            xfill True
+            yfill True
 
-            # Header with alignment
+            # Title bar with close button
             hbox:
-                spacing 20
-
-                # Large alignment indicator
-                frame:
-                    xysize (100, 100)
-                    background align_color
-
-                    vbox:
-                        align (0.5, 0.5)
-                        spacing 5
-
-                        if align_id == "evil":
-                            text "EVIL" align (0.5, 0.5) size 24 color "#000000"
-                        elif align_id == "good":
-                            text "GOOD" align (0.5, 0.5) size 24 color "#000000"
-                        else:
-                            text "NEUTRAL" align (0.5, 0.5) size 18 color "#ffffff"
-
-                vbox:
-                    spacing 10
-
-                    text "Moral Alignment" size 32 color "#ffffff"
-                    text "Your actions shape who you are" size 16 color "#888888"
-
-                    # Large karma value display
-                    hbox:
-                        spacing 10
-                        text "Karma:" size 24 color "#aaaaaa"
-                        text "[karma_value]" size 28 color align_color
-
-            null height 10
-
-            # Full karma bar
-            frame:
                 xfill True
-                padding (20, 15)
-                background "#333333"
+                text _("Karma") size 36 color "#ffffff"
+                textbutton _("Return") action Return() align (1.0, 0.5)
+
+            style_prefix "karma"
+
+            $ align_id, align_label, align_color = morality_manager.get_alignment()
+            $ karma_value = morality_manager.karma
+            $ summary = morality_manager.get_status_summary()
+
+            viewport:
+                scrollbars "vertical"
+                mousewheel True
+                xfill True
+                yfill True
 
                 vbox:
-                    spacing 10
+                    spacing 20
 
-                    text "Karma Scale" size 20 color "#ffffff"
-
+                    # Header with alignment
                     hbox:
-                        spacing 10
+                        spacing 20
 
-                        text "Evil" size 14 color "#ff3333" min_width 50
-                        text "-100" size 12 color "#666666"
-
+                        # Large alignment indicator
                         frame:
-                            xsize 400
-                            ysize 24
-                            background "#222222"
+                            xysize (100, 100)
+                            background align_color
 
-                            # Gradient-like appearance with sections
+                            vbox:
+                                align (0.5, 0.5)
+                                spacing 5
+
+                                if align_id == "evil":
+                                    text "EVIL" align (0.5, 0.5) size 24 color "#000000"
+                                elif align_id == "good":
+                                    text "GOOD" align (0.5, 0.5) size 24 color "#000000"
+                                else:
+                                    text "NEUTRAL" align (0.5, 0.5) size 18 color "#ffffff"
+
+                        vbox:
+                            spacing 10
+
+                            text "Moral Alignment" size 32 color "#ffffff"
+                            text "Your actions shape who you are" size 16 color "#888888"
+
+                            # Large karma value display
                             hbox:
-                                spacing 0
+                                spacing 10
+                                text "Karma:" size 24 color "#aaaaaa"
+                                text "[karma_value]" size 28 color align_color
 
-                                # Evil section
-                                frame:
-                                    xsize 140
-                                    ysize 24
-                                    background "#661111"
+                    null height 10
 
-                                # Neutral section
-                                frame:
-                                    xsize 120
-                                    ysize 24
-                                    background "#444444"
-
-                                # Good section
-                                frame:
-                                    xsize 140
-                                    ysize 24
-                                    background "#116611"
-
-                            # Karma position marker
-                            $ marker_x = int(((karma_value + 100) / 200.0) * 400)
-                            frame:
-                                pos (marker_x - 3, 0)
-                                xsize 6
-                                ysize 24
-                                background "#ffffff"
-
-                        text "+100" size 12 color "#666666"
-                        text "Good" size 14 color "#33ff33" min_width 50
-
-            # Statistics section
-            frame:
-                xfill True
-                padding (20, 15)
-                background "#333333"
-
-                vbox:
-                    spacing 10
-
-                    text "Karma Statistics" size 20 color "#ffffff"
-
-                    hbox:
-                        spacing 40
+                    # Full karma bar
+                    frame:
+                        xfill True
+                        padding (20, 15)
+                        background "#333333"
 
                         vbox:
-                            spacing 5
-                            text "Total Good Deeds" size 14 color "#888888"
-                            text "+[summary['total_positive']]" size 20 color "#33ff33"
+                            spacing 10
 
-                        vbox:
-                            spacing 5
-                            text "Total Bad Deeds" size 14 color "#888888"
-                            text "-[summary['total_negative']]" size 20 color "#ff3333"
-
-                        vbox:
-                            spacing 5
-                            text "Total Actions" size 14 color "#888888"
-                            text "[summary['changes_count']]" size 20 color "#ffffff"
-
-            # Recent karma history
-            frame:
-                xfill True
-                padding (20, 15)
-                background "#333333"
-
-                vbox:
-                    spacing 10
-
-                    text "Recent Actions" size 20 color "#ffffff"
-
-                    $ history = morality_manager.get_karma_history(limit=5)
-
-                    if history:
-                        for entry in history:
-                            $ entry_color = "#33ff33" if entry.amount > 0 else "#ff3333"
-                            $ entry_prefix = "+" if entry.amount > 0 else ""
+                            text "Karma Scale" size 20 color "#ffffff"
 
                             hbox:
                                 spacing 10
-                                text "[entry_prefix][entry.amount]" size 16 color entry_color min_width 50
-                                text entry.reason size 14 color "#aaaaaa"
-                    else:
-                        text "No karma changes recorded yet." size 14 color "#666666"
 
-            # Unlocked content section
-            $ unlocked = morality_manager.get_available_content()
-            if unlocked:
-                frame:
-                    xfill True
-                    padding (20, 15)
-                    background "#333333"
+                                text "Evil" size 14 color "#ff3333" min_width 50
+                                text "-100" size 12 color "#666666"
 
-                    vbox:
-                        spacing 10
+                                frame:
+                                    xsize 400
+                                    ysize 24
+                                    background "#222222"
 
-                        text "Unlocked Content" size 20 color "#ffffff"
+                                    # Gradient-like appearance with sections
+                                    hbox:
+                                        spacing 0
 
-                        for content_id in unlocked:
+                                        # Evil section
+                                        frame:
+                                            xsize 140
+                                            ysize 24
+                                            background "#661111"
+
+                                        # Neutral section
+                                        frame:
+                                            xsize 120
+                                            ysize 24
+                                            background "#444444"
+
+                                        # Good section
+                                        frame:
+                                            xsize 140
+                                            ysize 24
+                                            background "#116611"
+
+                                    # Karma position marker
+                                    $ marker_x = int(((karma_value + 100) / 200.0) * 400)
+                                    frame:
+                                        pos (marker_x - 3, 0)
+                                        xsize 6
+                                        ysize 24
+                                        background "#ffffff"
+
+                                text "+100" size 12 color "#666666"
+                                text "Good" size 14 color "#33ff33" min_width 50
+
+                    # Statistics section
+                    frame:
+                        xfill True
+                        padding (20, 15)
+                        background "#333333"
+
+                        vbox:
+                            spacing 10
+
+                            text "Karma Statistics" size 20 color "#ffffff"
+
                             hbox:
+                                spacing 40
+
+                                vbox:
+                                    spacing 5
+                                    text "Total Good Deeds" size 14 color "#888888"
+                                    text "+[summary['total_positive']]" size 20 color "#33ff33"
+
+                                vbox:
+                                    spacing 5
+                                    text "Total Bad Deeds" size 14 color "#888888"
+                                    text "-[summary['total_negative']]" size 20 color "#ff3333"
+
+                                vbox:
+                                    spacing 5
+                                    text "Total Actions" size 14 color "#888888"
+                                    text "[summary['changes_count']]" size 20 color "#ffffff"
+
+                    # Recent karma history
+                    frame:
+                        xfill True
+                        padding (20, 15)
+                        background "#333333"
+
+                        vbox:
+                            spacing 10
+
+                            text "Recent Actions" size 20 color "#ffffff"
+
+                            $ history = morality_manager.get_karma_history(limit=5)
+
+                            if history:
+                                for entry in history:
+                                    $ entry_color = "#33ff33" if entry.amount > 0 else "#ff3333"
+                                    $ entry_prefix = "+" if entry.amount > 0 else ""
+
+                                    hbox:
+                                        spacing 10
+                                        text "[entry_prefix][entry.amount]" size 16 color entry_color min_width 50
+                                        text entry.reason size 14 color "#aaaaaa"
+                            else:
+                                text "No karma changes recorded yet." size 14 color "#666666"
+
+                    # Unlocked content section
+                    $ unlocked = morality_manager.get_available_content()
+                    if unlocked:
+                        frame:
+                            xfill True
+                            padding (20, 15)
+                            background "#333333"
+
+                            vbox:
                                 spacing 10
-                                text "[*]" size 14 color align_color
-                                text content_id.replace("_", " ").title() size 14 color "#cccccc"
+
+                                text "Unlocked Content" size 20 color "#ffffff"
+
+                                for content_id in unlocked:
+                                    hbox:
+                                        spacing 10
+                                        text "[*]" size 14 color align_color
+                                        text content_id.replace("_", " ").title() size 14 color "#cccccc"
 
 # =============================================================================
 # STYLES FOR KARMA SCREEN
@@ -750,8 +771,9 @@ label change_karma(amount, reason="", notify=True):
         call screen karma_notification(amount, reason)
 
     # Notify about unlocked content
-    for content_id in unlocks:
-        $ renpy.notify("Unlocked: [content_id]")
+    python:
+        for content_id in unlocks:
+            renpy.notify("Unlocked: " + content_id)
     return
 
 # Quick karma helpers

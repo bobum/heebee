@@ -805,10 +805,11 @@ screen world_map_screen():
                 text loc.name[0:2] align (0.5, 0.5) size 16 color "#ffffff"
 
             # Location label
+            $ loc_color = "#ffffff" if loc.unlocked else "#666666"
             text loc.name:
                 pos (x_pos - 50, y_pos + 30)
                 size 12
-                color "#ffffff" if loc.unlocked else "#666666"
+                color loc_color
                 xalign 0.5
 
     # Current location info panel

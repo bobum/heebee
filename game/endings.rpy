@@ -3,7 +3,7 @@
 # multiple game endings with persistent storage, hidden endings support, and completion statistics.
 
 init python:
-    from datetime import datetime
+    import datetime as dt
 
     # =========================================================================
     # ENDING CLASS - Represents a single game ending
@@ -48,7 +48,7 @@ init python:
             """
             if not self.unlocked:
                 self.unlocked = True
-                self.unlock_date = datetime.now().isoformat()
+                self.unlock_date = dt.datetime.now().isoformat()
                 return True
             return False
 
@@ -674,7 +674,7 @@ init python:
 # =============================================================================
 
 screen endings_gallery():
-    """Main endings gallery screen showing all endings and completion status."""
+    # Main endings gallery screen showing all endings and completion status.
 
     tag menu
     modal True
@@ -682,146 +682,153 @@ screen endings_gallery():
     default selected_ending = None
     default selected_category = "all"
 
-    use game_menu(_("Endings Gallery"), scroll=None):
-
-        style_prefix "endings"
+    frame:
+        xfill True
+        yfill True
+        background "#1a1a2e"
+        padding (40, 40)
 
         vbox:
             spacing 15
 
-            # Completion Statistics Header
-            frame:
-                xfill True
-                padding (20, 15)
-                background "#2a2a4a"
-
-                hbox:
-                    spacing 30
-                    xalign 0.5
-
-                    vbox:
-                        xalign 0.5
-                        spacing 5
-
-                        text "Overall Completion" size 18 color "#aaaaff" xalign 0.5
-
-                        $ completion = endings_manager.get_completion_percentage()
-                        $ stats = endings_manager.get_stats()
-
-                        hbox:
-                            spacing 10
-                            xalign 0.5
-
-                            text "{:.1f}%".format(completion) size 32 color "#ffffff" bold True
-
-                        text "{}/{} Endings Unlocked".format(stats["unlocked"], stats["total"]) size 14 color "#888899" xalign 0.5
-
-                        # Completion bar
-                        bar:
-                            value completion
-                            range 100.0
-                            xsize 250
-                            ysize 12
-                            left_bar "#66ff66"
-                            right_bar "#333344"
-                            xalign 0.5
-
-            # Category Filter Buttons
+            # Header with title and close button
             hbox:
-                spacing 10
-                xalign 0.5
+                xfill True
+                text "Endings Gallery" size 36 color "#aaaaff"
+                textbutton "Return" action Return() xalign 1.0
 
-                textbutton "All" action SetScreenVariable("selected_category", "all"):
-                    style "endings_category_button"
-                    selected selected_category == "all"
+            style_prefix "endings"
 
-                for category in endings_manager.get_categories():
-                    $ cat_label = category.replace("_", " ").title()
-                    textbutton cat_label action SetScreenVariable("selected_category", category):
-                        style "endings_category_button"
-                        selected selected_category == category
+            vbox:
+                spacing 15
 
-            null height 10
-
-            # Endings Grid
-            viewport:
-                scrollbars "vertical"
-                mousewheel True
-                draggable True
-                ysize 400
-
-                vbox:
-                    spacing 10
+                # Completion Statistics Header
+                frame:
                     xfill True
+                    padding (20, 15)
+                    background "#2a2a4a"
 
-                    if selected_category == "all":
-                        $ display_endings = endings_manager.get_visible_endings()
-                    else:
-                        $ display_endings = [e for e in endings_manager.get_endings_by_category(selected_category) if e.unlocked or not e.hidden]
+                    hbox:
+                        spacing 30
+                        xalign 0.5
 
-                    for ending in display_endings:
-                        button:
-                            action SetScreenVariable("selected_ending", ending)
-                            xfill True
-                            padding (15, 12)
+                        vbox:
+                            xalign 0.5
+                            spacing 5
 
-                            if ending.unlocked:
-                                background "#3a4a3a"
-                                hover_background "#4a5a4a"
-                            else:
-                                background "#3a3a4a"
-                                hover_background "#4a4a5a"
+                            text "Overall Completion" size 18 color "#aaaaff" xalign 0.5
+
+                            $ completion = endings_manager.get_completion_percentage()
+                            $ stats = endings_manager.get_stats()
 
                             hbox:
-                                spacing 15
+                                spacing 10
+                                xalign 0.5
 
-                                # Unlock status icon
-                                frame:
-                                    xysize (50, 50)
-                                    background "#222233"
+                                text "{:.1f}%".format(completion) size 32 color "#ffffff" bold True
 
-                                    if ending.unlocked:
-                                        text "{color=#66ff66}[check]{/color}" align (0.5, 0.5) size 28
-                                    elif ending.hidden:
-                                        text "{color=#666666}?{/color}" align (0.5, 0.5) size 28
-                                    else:
-                                        text "{color=#ff6666}[lock]{/color}" align (0.5, 0.5) size 28
+                            text "{}/{} Endings Unlocked".format(stats["unlocked"], stats["total"]) size 14 color "#888899" xalign 0.5
 
-                                vbox:
-                                    spacing 4
+                            # Completion bar
+                            bar:
+                                value completion
+                                range 100.0
+                                xsize 250
+                                ysize 12
+                                left_bar "#66ff66"
+                                right_bar "#333344"
+                                xalign 0.5
 
-                                    # Ending name
-                                    text ending.get_display_name() size 20:
+                # Category Filter Buttons
+                hbox:
+                    spacing 10
+                    xalign 0.5
+
+                    textbutton "All" action SetScreenVariable("selected_category", "all"):
+                        style "endings_category_button"
+                        selected selected_category == "all"
+
+                    for category in endings_manager.get_categories():
+                        $ cat_label = category.replace("_", " ").title()
+                        textbutton cat_label action SetScreenVariable("selected_category", category):
+                            style "endings_category_button"
+                            selected selected_category == category
+
+                null height 10
+
+                # Endings Grid
+                viewport:
+                    scrollbars "vertical"
+                    mousewheel True
+                    draggable True
+                    ysize 400
+
+                    vbox:
+                        spacing 10
+                        xfill True
+
+                        if selected_category == "all":
+                            $ display_endings = endings_manager.get_visible_endings()
+                        else:
+                            $ display_endings = [e for e in endings_manager.get_endings_by_category(selected_category) if e.unlocked or not e.hidden]
+
+                        for ending in display_endings:
+                            button:
+                                action SetScreenVariable("selected_ending", ending)
+                                xfill True
+                                padding (15, 12)
+
+                                if ending.unlocked:
+                                    background "#3a4a3a"
+                                    hover_background "#4a5a4a"
+                                else:
+                                    background "#3a3a4a"
+                                    hover_background "#4a4a5a"
+
+                                hbox:
+                                    spacing 15
+
+                                    # Unlock status icon
+                                    frame:
+                                        xysize (50, 50)
+                                        background "#222233"
+
                                         if ending.unlocked:
-                                            color "#ffffff"
+                                            text "{color=#66ff66}[check]{/color}" align (0.5, 0.5) size 28
+                                        elif ending.hidden:
+                                            text "{color=#666666}?{/color}" align (0.5, 0.5) size 28
                                         else:
-                                            color "#888888"
+                                            text "{color=#ff6666}[lock]{/color}" align (0.5, 0.5) size 28
 
-                                    # Category and status
-                                    hbox:
-                                        spacing 15
+                                    vbox:
+                                        spacing 4
 
-                                        $ cat_display = ending.category.replace("_", " ").title()
-                                        text cat_display size 12 color "#666688"
+                                        # Ending name
+                                        $ name_color = "#ffffff" if ending.unlocked else "#888888"
+                                        text ending.get_display_name() size 20 color name_color
 
-                                        if ending.unlocked and ending.unlock_date:
-                                            $ date_display = ending.unlock_date[:10] if ending.unlock_date else ""
-                                            text "Unlocked: [date_display]" size 12 color "#668866"
+                                        # Category and status
+                                        hbox:
+                                            spacing 15
 
-                                    # Brief description/hint
-                                    $ brief = ending.get_display_description()
-                                    if len(brief) > 80:
-                                        $ brief = brief[:77] + "..."
-                                    text brief size 14:
-                                        if ending.unlocked:
-                                            color "#aaaaaa"
-                                        else:
-                                            color "#666666"
+                                            $ cat_display = ending.category.replace("_", " ").title()
+                                            text cat_display size 12 color "#666688"
 
-            # Show hidden endings count if any exist
-            $ hidden_count = len([e for e in endings_manager.get_hidden_endings() if not e.unlocked])
-            if hidden_count > 0:
-                text "... and [hidden_count] hidden ending(s) to discover" size 14 color "#666666" xalign 0.5
+                                            if ending.unlocked and ending.unlock_date:
+                                                $ date_display = ending.unlock_date[:10] if ending.unlock_date else ""
+                                                text "Unlocked: [date_display]" size 12 color "#668866"
+
+                                        # Brief description/hint
+                                        $ brief = ending.get_display_description()
+                                        if len(brief) > 80:
+                                            $ brief = brief[:77] + "..."
+                                        $ brief_color = "#aaaaaa" if ending.unlocked else "#666666"
+                                        text brief size 14 color brief_color
+
+                # Show hidden endings count if any exist
+                $ hidden_count = len([e for e in endings_manager.get_hidden_endings() if not e.unlocked])
+                if hidden_count > 0:
+                    text "... and [hidden_count] hidden ending(s) to discover" size 14 color "#666666" xalign 0.5
 
     # Ending Detail Popup
     if selected_ending:
@@ -829,7 +836,7 @@ screen endings_gallery():
 
 
 screen ending_detail_popup(ending):
-    """Popup screen showing detailed information about a selected ending."""
+    # Popup screen showing detailed information about a selected ending.
 
     modal True
 
@@ -846,11 +853,8 @@ screen ending_detail_popup(ending):
             hbox:
                 xfill True
 
-                text ending.get_display_name() size 28:
-                    if ending.unlocked:
-                        color "#ffffff"
-                    else:
-                        color "#888888"
+                $ header_color = "#ffffff" if ending.unlocked else "#888888"
+                text ending.get_display_name() size 28 color header_color
 
                 textbutton "X":
                     action SetScreenVariable("selected_ending", None)
@@ -899,11 +903,8 @@ screen ending_detail_popup(ending):
                 scrollbars "vertical"
                 mousewheel True
 
-                text ending.get_display_description() size 18:
-                    if ending.unlocked:
-                        color "#cccccc"
-                    else:
-                        color "#888888"
+                $ desc_color = "#cccccc" if ending.unlocked else "#888888"
+                text ending.get_display_description() size 18 color desc_color
 
             # Close button
             textbutton "Close":
@@ -915,7 +916,7 @@ screen ending_detail_popup(ending):
 
 
 screen endings_completion_badge():
-    """Small completion badge that can be shown on the main menu."""
+    # Small completion badge that can be shown on the main menu.
 
     $ stats = endings_manager.get_stats()
     $ completion = stats["completion_percentage"]
@@ -970,8 +971,9 @@ label show_endings_gallery:
 # Check and potentially unlock endings based on requirements
 label check_ending_requirements:
     $ available = endings_manager.get_available_endings()
-    for ending in available:
-        call unlock_ending(ending.id, notify=True)
+    python:
+        for ending in available:
+            renpy.call("unlock_ending", ending.id, True)
     return
 
 
@@ -980,11 +982,8 @@ label check_ending_requirements:
 # =============================================================================
 
 # Initialize endings when game starts
-label after_load:
-    $ setup_example_endings()
-    return
-
-label splashscreen:
+# Note: Call setup_example_endings() from your main after_load or splashscreen label
+label endings_init:
     $ setup_example_endings()
     return
 

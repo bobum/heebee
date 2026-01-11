@@ -336,7 +336,7 @@ default accessibility_manager = AccessibilityManager()
 # ============================================================================
 
 screen accessibility_settings():
-    """Main accessibility settings menu."""
+    # Main accessibility settings menu.
 
     tag menu
     modal True
@@ -402,10 +402,11 @@ screen accessibility_settings():
 
                     null width 50
 
+                    $ hc_color = scheme["hover"] if accessibility_manager.high_contrast else scheme["idle"]
                     textbutton ("On" if accessibility_manager.high_contrast else "Off"):
                         action ToggleField(accessibility_manager, "high_contrast")
                         style "accessibility_toggle"
-                        text_color scheme["hover"] if accessibility_manager.high_contrast else scheme["idle"]
+                        text_color hc_color
 
             # Colorblind Mode Section
             frame:
@@ -423,10 +424,11 @@ screen accessibility_settings():
                         spacing 10
 
                         for mode in AccessibilityManager.COLORBLIND_MODES:
+                            $ cb_color = scheme["selected"] if accessibility_manager.colorblind_mode == mode else scheme["idle"]
                             textbutton mode.title():
                                 action SetField(accessibility_manager, "colorblind_mode", mode)
                                 style "accessibility_choice"
-                                text_color scheme["selected"] if accessibility_manager.colorblind_mode == mode else scheme["idle"]
+                                text_color cb_color
 
             # Reduce Motion Section
             frame:
@@ -442,10 +444,11 @@ screen accessibility_settings():
 
                     null width 50
 
+                    $ rm_color = scheme["hover"] if accessibility_manager.reduce_motion else scheme["idle"]
                     textbutton ("On" if accessibility_manager.reduce_motion else "Off"):
                         action ToggleField(accessibility_manager, "reduce_motion")
                         style "accessibility_toggle"
-                        text_color scheme["hover"] if accessibility_manager.reduce_motion else scheme["idle"]
+                        text_color rm_color
 
             # Button Hold Time Section
             frame:
@@ -485,10 +488,11 @@ screen accessibility_settings():
 
                     null width 50
 
+                    $ sr_color = scheme["hover"] if accessibility_manager.screen_reader_enabled else scheme["idle"]
                     textbutton ("On" if accessibility_manager.screen_reader_enabled else "Off"):
                         action ToggleField(accessibility_manager, "screen_reader_enabled")
                         style "accessibility_toggle"
-                        text_color scheme["hover"] if accessibility_manager.screen_reader_enabled else scheme["idle"]
+                        text_color sr_color
 
             null height 10
 
@@ -507,7 +511,7 @@ screen accessibility_settings():
 
 
 screen font_size_preview():
-    """Font size preview screen showing different text sizes."""
+    # Font size preview screen showing different text sizes.
 
     modal True
 
@@ -543,7 +547,7 @@ screen font_size_preview():
 
 
 screen color_scheme_selector():
-    """Color scheme selection and preview screen."""
+    # Color scheme selection and preview screen.
 
     modal True
 
@@ -584,10 +588,11 @@ screen color_scheme_selector():
                 xalign 0.5
 
                 for mode in AccessibilityManager.COLORBLIND_MODES:
+                    $ cb_sel_color = scheme["selected"] if accessibility_manager.colorblind_mode == mode else scheme["idle"]
                     textbutton mode.title():
                         action SetField(accessibility_manager, "colorblind_mode", mode)
                         style "accessibility_choice"
-                        text_color scheme["selected"] if accessibility_manager.colorblind_mode == mode else scheme["idle"]
+                        text_color cb_sel_color
 
             null height 20
 
@@ -629,7 +634,7 @@ screen color_scheme_selector():
 
 
 screen motion_settings():
-    """Motion and animation settings screen."""
+    # Motion and animation settings screen.
 
     modal True
 
